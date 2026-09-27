@@ -750,11 +750,9 @@ const STAGES = [
 ];
 
 /* ============================================================
-   8. GLB 加载器（绝对地址）
+   8. GLB 加载器 · 优化版
    ============================================================ */
 const HUMAN_MODEL = { loaded: false, meshes: [], center: [0,0,0], size: 0 };
-
-// ★★★ 用绝对地址，从 GitHub Pages 直接加载 ★★★
 const GLB_URL = 'https://yuxiaojiededian.github.io/xy.school.edu.github.io/bambino_gonfiabile.glb';
 
 function parseGLB(arrayBuffer){
@@ -782,17 +780,48 @@ function parseGLB(arrayBuffer){
   return { gltf: jsonChunk, bin: binChunk };
 }
 
+/* ---------- 优化的 readAccessor：TypedArray 直接映射 ---------- */
 function readAccessor(gltf, buffers, idx){
   const acc = gltf.accessors[idx];
   const bv  = gltf.bufferViews[acc.bufferView];
   const buf = buffers[bv.buffer];
-  const view = new DataView(buf);
   const base = (bv.byteOffset||0) + (acc.byteOffset||0);
+
   const ts = {SCALAR:1, VEC2:2, VEC3:3, VEC4:4}[acc.type];
+  const count = acc.count;
+  const total = count * ts;
   const cs = {5126:4, 5123:2, 5125:4, 5121:1}[acc.componentType];
-  const stride = bv.byteStride || (ts*cs);
-  const out = new Float32Array(acc.count*ts);
-  for(let i=0;i<acc.count;i++){
+  const stride = bv.byteStride || (ts * cs);
+
+  // 紧凑排列 → 直接映射（零拷贝）
+  if(stride === ts * cs){
+    if(acc.componentType === 5126){
+      return new Float32Array(buf, base, total).slice();
+    }
+    if(acc.componentType === 5123){
+      const src = new Uint16Array(buf, base, total);
+      const out = new Float32Array(total);
+      for(let i=0;i<total;i++) out[i] = src[i];
+      return out;
+    }
+    if(acc.componentType === 5125){
+      const src = new Uint32Array(buf, base, total);
+      const out = new Float32Array(total);
+      for(let i=0;i<total;i++) out[i] = src[i];
+      return out;
+    }
+    if(acc.componentType === 5121){
+      const src = new Uint8Array(buf, base, total);
+      const out = new Float32Array(total);
+      for(let i=0;i<total;i++) out[i] = src[i];
+      return out;
+    }
+  }
+
+  // stride 不紧凑 → 回退到逐元素
+  const view = new DataView(buf);
+  const out = new Float32Array(total);
+  for(let i=0;i<count;i++){
     const o = base + i*stride;
     for(let j=0;j<ts;j++){
       const off = o + j*cs;
@@ -803,6 +832,29 @@ function readAccessor(gltf, buffers, idx){
     }
   }
   return out;
+}
+
+/* ---------- 直接读索引，不转 Float32 ---------- */
+function readIndices(gltf, buffers, idx){
+  const acc = gltf.accessors[idx];
+  const bv  = gltf.bufferViews[acc.bufferView];
+  const buf = buffers[bv.buffer];
+  const base = (bv.byteOffset||0) + (acc.byteOffset||0);
+  const count = acc.count;
+
+  if(acc.componentType === 5125){
+    return { array: new Uint32Array(buf, base, count).slice(), type: 5125 };
+  }
+  if(acc.componentType === 5123){
+    return { array: new Uint16Array(buf, base, count).slice(), type: 5123 };
+  }
+  if(acc.componentType === 5121){
+    const src = new Uint8Array(buf, base, count);
+    const out = new Uint16Array(count);
+    for(let i=0;i<count;i++) out[i] = src[i];
+    return { array: out, type: 5123 };
+  }
+  throw new Error('unsupported index componentType: ' + acc.componentType);
 }
 
 function classifyMesh(name){
@@ -819,13 +871,18 @@ function classifyMesh(name){
 async function loadHumanModel(){
   const info = document.getElementById('modelLoadInfo');
   info.textContent = '加载 GLB 模型…';
+  const t0 = performance.now();
   try {
     const res = await fetch(GLB_URL);
     if(!res.ok) throw new Error('GLB ' + res.status);
     const arrayBuffer = await res.arrayBuffer();
+    const t1 = performance.now();
     info.textContent = '解析 GLB (' + (arrayBuffer.byteLength/1024/1024).toFixed(1) + ' MB)…';
+
     const { gltf, bin } = parseGLB(arrayBuffer);
     const buffers = gltf.buffers.map(() => bin);
+    const t2 = performance.now();
+
     info.textContent = '解析网格…';
     const rawMeshes = [];
     for(const mesh of gltf.meshes){
@@ -834,11 +891,17 @@ async function loadHumanModel(){
         const normals = prim.attributes.NORMAL !== undefined
           ? readAccessor(gltf, buffers, prim.attributes.NORMAL)
           : new Float32Array(positions.length);
-        const indices = prim.indices !== undefined
-          ? readAccessor(gltf, buffers, prim.indices) : null;
-        rawMeshes.push({ name: mesh.name||'mesh', positions, normals, indices });
+        const indicesData = prim.indices !== undefined
+          ? readIndices(gltf, buffers, prim.indices) : null;
+        rawMeshes.push({
+          name: mesh.name||'mesh',
+          positions, normals,
+          indices: indicesData ? indicesData.array : null,
+          indexType: indicesData ? indicesData.type : 0
+        });
       }
     }
+    const t3 = performance.now();
     console.log('原始网格数:', rawMeshes.length);
 
     let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
@@ -876,24 +939,28 @@ async function loadHumanModel(){
       }
       gl.bufferData(gl.ARRAY_BUFFER, inter, gl.STATIC_DRAW);
 
-      let ibo=null, ic=0, hasIdx=false, is32=false;
+      let ibo=null, ic=0, hasIdx=false, useUint32=false;
       if(m.indices){
         ibo = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-        is32 = m.positions.length/3 > 65535;
-        const idxArr = is32 ? new Uint32Array(m.indices) : new Uint16Array(m.indices);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idxArr, gl.STATIC_DRAW);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.indices, gl.STATIC_DRAW);
         ic = m.indices.length; hasIdx = true;
+        useUint32 = (m.indexType === 5125);
       } else { ic = m.positions.length/3; }
 
       const cls = classifyMesh(m.name);
       HUMAN_MODEL.meshes.push({
-        vbo, ibo, ic, hasIdx, is32,
+        vbo, ibo, ic, hasIdx,
+        useUint32,
         name: m.name, class: cls,
         color: [0.92, 0.76, 0.66],
         isSkin: cls === 'skin'
       });
     }
+
+    const t4 = performance.now();
+    console.log('⏱️ 下载 ' + (t1-t0).toFixed(0) + 'ms, 解析GLB ' + (t2-t1).toFixed(0) +
+                'ms, 遍历网格 ' + (t3-t2).toFixed(0) + 'ms, 上传GPU ' + (t4-t3).toFixed(0) + 'ms');
 
     HUMAN_MODEL.loaded = true;
     HUMAN_MODEL.center = [cx, cy, cz];
@@ -901,17 +968,16 @@ async function loadHumanModel(){
     camera.target = [cx, cy, cz];
     camera.distance = size * 2.2;
 
+    const totalMs = (t4 - t0).toFixed(0);
     info.textContent = '✅ GLB 加载完成 (' + filtered.length + ' 网格, ' +
-      size.toFixed(2) + ' 单位高, ' +
-      (arrayBuffer.byteLength/1024/1024).toFixed(1) + ' MB)';
+      size.toFixed(2) + ' 单位高, 耗时 ' + totalMs + 'ms)';
     setTimeout(()=> { info.style.opacity = '0'; }, 3500);
 
     applyPhenotypeToModel();
     buildAll();
   } catch(e) {
     console.error(e);
-    info.textContent = '❌ GLB 加载失败: ' + e.message +
-      '\nURL: ' + GLB_URL;
+    info.textContent = '❌ GLB 加载失败: ' + e.message + '\nURL: ' + GLB_URL;
   }
 }
 
@@ -955,7 +1021,7 @@ function renderHumanModel(view, proj, eye){
     gl.uniform1f(U.rough, m.isSkin ? 0.5 : 0.8);
     if(m.hasIdx){
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ibo);
-      gl.drawElements(gl.TRIANGLES, m.ic, m.is32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
+      gl.drawElements(gl.TRIANGLES, m.ic, m.useUint32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
     } else {
       gl.drawArrays(gl.TRIANGLES, 0, m.ic);
     }

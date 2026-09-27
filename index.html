@@ -19,8 +19,38 @@
     font-family:-apple-system,'PingFang SC','Microsoft YaHei','Segoe UI',Roboto,sans-serif;
     -webkit-font-smoothing:antialiased; }
 body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var(--text); }
-#glCanvas { position:fixed; top:0; left:0; width:100%; height:100%; display:block; cursor:grab; }
-#glCanvas:active { cursor:grabbing; }
+#stage {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+}
+#glCanvas {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  display:block;
+}
+#imgWrap {
+  position:absolute;
+  width:min(70vh, 60vw);
+  height:min(70vh, 60vw);
+  display:none;
+  align-items:center; justify-content:center;
+  transition:opacity .6s ease;
+}
+#imgWrap.show { display:flex; }
+#humanImg {
+  max-width:100%;
+  max-height:100%;
+  object-fit:contain;
+  transition:filter .6s ease, transform .6s cubic-bezier(.4,0,.2,1);
+  filter: brightness(1) saturate(1) hue-rotate(0deg);
+  transform: scaleY(1) scaleX(1);
+}
+#cellCanvas {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  display:block;
+}
+
+/* ===== UI ===== */
 .card { position:absolute; background:var(--card); border-radius:16px;
   box-shadow:0 2px 12px rgba(37,99,235,.08), 0 1px 3px rgba(0,0,0,.04);
   color:var(--text); z-index:10; transition:opacity .3s ease; }
@@ -38,7 +68,7 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
 .stat .k { color:rgba(255,255,255,.78); font-size:.7rem; }
 .stat .v { font-family:'SF Mono',Consolas,monospace; font-weight:600; font-size:.76rem;
   padding:3px 10px; border-radius:12px; background:rgba(255,255,255,.18); color:#FFF; }
-.stat .v.sex { color:#FDE68A; } .stat .v.fps { color:var(--blue-light); }
+.stat .v.sex { color:#FDE68A; }
 #genePanel { top:96px; left:20px; width:278px; max-height:calc(100vh - 230px);
   overflow-y:auto; padding:18px 20px; border:1px solid var(--border); }
 #genePanel::-webkit-scrollbar { width:5px; }
@@ -62,25 +92,6 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
   justify-content:flex-end; gap:5px; }
 .gene-row .swatch { width:11px; height:11px; border-radius:50%;
   display:inline-block; box-shadow:0 0 0 1px rgba(0,0,0,.08); flex-shrink:0; }
-#controlPanel { top:96px; right:20px; width:210px;
-  display:flex; flex-direction:column; gap:2px;
-  padding:16px 14px; border:1px solid var(--border); }
-#controlPanel h3 { font-size:.82rem; font-weight:600; color:var(--text);
-  margin-bottom:8px; padding:0 4px; display:flex; align-items:center; gap:8px; }
-#controlPanel h3::before { content:""; width:6px; height:6px; border-radius:50%;
-  background:var(--blue); }
-.param-toggle { display:flex; align-items:center; justify-content:space-between;
-  font-size:.75rem; color:var(--text); cursor:pointer; padding:8px 6px;
-  border-radius:9px; transition:background .15s ease; font-weight:500; }
-.param-toggle:hover { background:#F1F5F9; }
-.param-toggle input { appearance:none; -webkit-appearance:none; width:36px; height:21px;
-  border-radius:11px; background:#CBD5E1; position:relative; cursor:pointer;
-  transition:background .25s cubic-bezier(.4,0,.2,1); flex-shrink:0; outline:none; }
-.param-toggle input::after { content:""; position:absolute; top:2px; left:2px;
-  width:17px; height:17px; border-radius:50%; background:#FFF;
-  transition:transform .25s cubic-bezier(.4,0,.2,1); box-shadow:0 1px 3px rgba(0,0,0,.25); }
-.param-toggle input:checked { background:var(--blue); }
-.param-toggle input:checked::after { transform:translateX(15px); }
 #timeline { position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
   display:flex; flex-direction:column; gap:12px; padding:16px 20px;
   width:min(840px, 95vw); background:var(--card); border-radius:18px;
@@ -131,14 +142,9 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
   background:rgba(30,41,59,.85); backdrop-filter:blur(8px); border-radius:18px;
   color:var(--blue-light); font-size:.68rem; font-family:'SF Mono',Consolas,monospace;
   transition:opacity .35s; pointer-events:none; }
-#modelLoadInfo { position:fixed; top:64px; left:50%; transform:translateX(-50%);
-  background:rgba(30,41,59,.85); backdrop-filter:blur(8px); color:var(--blue-light);
-  font:12px 'SF Mono',Consolas,monospace; padding:8px 16px; border-radius:8px;
-  z-index:100; max-width:90vw; white-space:pre; text-align:center;
-  pointer-events:none; transition:opacity .4s; line-height:1.5; }
 .ui-hidden { opacity: 0 !important; pointer-events: none !important; }
 @media (max-width:1200px) {
-  #controlPanel { display:none; } #genePanel { width:240px; }
+  #genePanel { width:240px; }
   #topBar { gap:14px; padding:9px 18px; } #topBar h1 { font-size:.84rem; }
 }
 @media (max-width:720px) {
@@ -149,31 +155,26 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
 </style>
 </head>
 <body>
-<canvas id="glCanvas"></canvas>
+
+<div id="stage">
+  <canvas id="cellCanvas"></canvas>
+  <div id="imgWrap">
+    <img id="humanImg" src="胎儿1.png" alt="胎儿" crossorigin="anonymous">
+  </div>
+</div>
+
 <div id="f5Badge">按 F5 切换 UI</div>
-<div id="modelLoadInfo">初始化…</div>
 
 <div id="topBar" class="card">
-  <h1>基因决定外貌 · 3D 人体发育</h1>
+  <h1>基因决定外貌 · 发育模拟</h1>
   <div class="stat"><span class="k">性别</span><span class="v sex" id="statSex">—</span></div>
   <div class="stat"><span class="k">身高</span><span class="v" id="statHeight">—</span></div>
-  <div class="stat"><span class="k">细胞</span><span class="v" id="statCells">1</span></div>
   <div class="stat"><span class="k">阶段</span><span class="v" id="statStage">受精卵</span></div>
-  <div class="stat"><span class="k">FPS</span><span class="v fps" id="statFps">--</span></div>
 </div>
 
 <div id="genePanel" class="card">
   <h3>基因型 → 外貌表现</h3>
   <div id="geneList"></div>
-</div>
-
-<div id="controlPanel" class="card">
-  <h3>显示选项</h3>
-  <label class="param-toggle"><span>自动旋转</span><input type="checkbox" id="autoRotate" checked></label>
-  <label class="param-toggle"><span>显示皮肤</span><input type="checkbox" id="showSkin" checked></label>
-  <label class="param-toggle"><span>显示器官</span><input type="checkbox" id="showOrgans" checked></label>
-  <label class="param-toggle"><span>显示骨骼</span><input type="checkbox" id="showSkeleton"></label>
-  <label class="param-toggle"><span>显示细胞群</span><input type="checkbox" id="showCells" checked></label>
 </div>
 
 <div id="timeline">
@@ -338,699 +339,162 @@ const GeneEngine = {
 };
 
 /* ============================================================
-   2. 矩阵
-   ============================================================ */
-const mat4 = {
-  create(){ return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]); },
-  perspective(o,fov,asp,n,f){
-    const t = 1/Math.tan(fov/2);
-    o[0]=t/asp;o[1]=0;o[2]=0;o[3]=0;o[4]=0;o[5]=t;o[6]=0;o[7]=0;
-    o[8]=0;o[9]=0;o[10]=(f+n)/(n-f);o[11]=-1;
-    o[12]=0;o[13]=0;o[14]=(2*f*n)/(n-f);o[15]=0;
-    return o;
-  },
-  lookAt(o,eye,ctr,up){
-    let z0=eye[0]-ctr[0],z1=eye[1]-ctr[1],z2=eye[2]-ctr[2];
-    let l=Math.hypot(z0,z1,z2)||1; z0/=l;z1/=l;z2/=l;
-    let x0=up[1]*z2-up[2]*z1,x1=up[2]*z0-up[0]*z2,x2=up[0]*z1-up[1]*z0;
-    l=Math.hypot(x0,x1,x2)||1; x0/=l;x1/=l;x2/=l;
-    const y0=z1*x2-z2*x1, y1=z2*x0-z0*x2, y2=z0*x1-z1*x0;
-    o[0]=x0;o[1]=y0;o[2]=z0;o[3]=0;o[4]=x1;o[5]=y1;o[6]=z1;o[7]=0;
-    o[8]=x2;o[9]=y2;o[10]=z2;o[11]=0;
-    o[12]=-(x0*eye[0]+x1*eye[1]+x2*eye[2]);
-    o[13]=-(y0*eye[0]+y1*eye[1]+y2*eye[2]);
-    o[14]=-(z0*eye[0]+z1*eye[1]+z2*eye[2]);
-    o[15]=1; return o;
-  },
-  invert(o,a){
-    const a00=a[0],a01=a[1],a02=a[2],a03=a[3];
-    const a10=a[4],a11=a[5],a12=a[6],a13=a[7];
-    const a20=a[8],a21=a[9],a22=a[10],a23=a[11];
-    const a30=a[12],a31=a[13],a32=a[14],a33=a[15];
-    const b00=a00*a11-a01*a10, b01=a00*a12-a02*a10, b02=a00*a13-a03*a10,
-          b03=a01*a12-a02*a11, b04=a01*a13-a03*a11, b05=a02*a13-a03*a12,
-          b06=a20*a31-a21*a30, b07=a20*a32-a22*a30, b08=a20*a33-a23*a30,
-          b09=a21*a32-a22*a31, b10=a21*a33-a23*a31, b11=a22*a33-a23*a32;
-    let det = b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;
-    if(!det) return null;
-    det = 1/det;
-    o[0]=(a11*b11-a12*b10+a13*b09)*det; o[1]=(a02*b10-a01*b11-a03*b09)*det;
-    o[2]=(a31*b05-a32*b04+a33*b03)*det; o[3]=(a22*b04-a21*b05-a23*b03)*det;
-    o[4]=(a12*b08-a10*b11-a13*b07)*det; o[5]=(a00*b11-a02*b08+a03*b07)*det;
-    o[6]=(a32*b02-a30*b05-a33*b01)*det; o[7]=(a20*b05-a22*b02+a23*b01)*det;
-    o[8]=(a10*b10-a11*b08+a13*b06)*det; o[9]=(a01*b08-a00*b10-a03*b06)*det;
-    o[10]=(a30*b04-a31*b02+a33*b00)*det; o[11]=(a21*b02-a20*b04-a23*b00)*det;
-    o[12]=(a11*b07-a10*b09-a12*b06)*det; o[13]=(a00*b09-a01*b07+a02*b06)*det;
-    o[14]=(a31*b01-a30*b03-a32*b00)*det; o[15]=(a20*b03-a21*b01+a22*b00)*det;
-    return o;
-  },
-  transpose3(m){
-    const a01=m[1], a02=m[2], a12=m[5];
-    m[1]=m[3]; m[2]=m[6]; m[3]=a01; m[5]=m[7]; m[6]=a02; m[7]=a12;
-    return m;
-  }
-};
-
-/* ============================================================
-   3. WebGL
-   ============================================================ */
-const canvas = document.getElementById('glCanvas');
-const gl = canvas.getContext('webgl', { antialias:true, alpha:false, powerPreference:'high-performance' });
-if(!gl){ alert('浏览器不支持 WebGL'); return; }
-
-const vsSrc = `
-attribute vec3 aPosition; attribute vec3 aNormal;
-uniform mat4 uModel, uView, uProjection; uniform mat3 uNormalMatrix;
-varying vec3 vNormal, vWorldPos, vObjPos;
-void main(){
-  vec4 wp = uModel * vec4(aPosition,1.0);
-  vWorldPos = wp.xyz;
-  vObjPos = aPosition;
-  vNormal = uNormalMatrix * aNormal;
-  gl_Position = uProjection * uView * wp;
-}`;
-
-const fsSrc = `
-precision highp float;
-varying vec3 vNormal, vWorldPos, vObjPos;
-uniform vec3 uColor, uCamPos;
-uniform float uHighlight, uOpacity, uSSS, uRough;
-
-void main(){
-  vec3 n = normalize(vNormal);
-  vec3 vd = normalize(uCamPos - vWorldPos);
-  vec3 l1 = normalize(vec3(0.4, 0.9, 0.5));
-  vec3 l2 = normalize(vec3(-0.6, 0.2, -0.4));
-  float d1 = max(dot(n, l1), 0.0);
-  float d2 = max(dot(n, l2), 0.0);
-  vec3 h = normalize(l1 + vd);
-  float spec = pow(max(dot(n, h), 0.0), mix(24.0, 72.0, 1.0-uRough)) * (1.0-uRough) * 0.55;
-  float rim = pow(1.0 - max(dot(n, vd), 0.0), 3.0);
-  float ao = 0.82 + 0.18 * smoothstep(-4.0, 6.0, vObjPos.y);
-  vec3 sssColor = vec3(0.92, 0.52, 0.42);
-  float sss = rim * uSSS;
-  vec3 ambient  = uColor * 0.32;
-  vec3 diffuse  = uColor * d1 * 0.62 * ao;
-  vec3 fill     = uColor * d2 * 0.22 * vec3(0.78, 0.86, 1.0);
-  vec3 specCol  = vec3(1.0, 0.99, 0.96) * spec;
-  vec3 rimCol   = uColor * rim * 0.28;
-  vec3 sssAdd   = sssColor * sss;
-  vec3 col = ambient + diffuse + fill + specCol + rimCol + sssAdd;
-  col += vec3(0.4, 0.6, 1.0) * uHighlight * 0.5;
-  gl_FragColor = vec4(col, uOpacity);
-}`;
-
-function compile(type, src){
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src); gl.compileShader(s);
-  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
-    console.error(gl.getShaderInfoLog(s)); return null;
-  }
-  return s;
-}
-const prog = gl.createProgram();
-gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSrc));
-gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSrc));
-gl.linkProgram(prog);
-if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
-  console.error(gl.getProgramInfoLog(prog)); return;
-}
-gl.useProgram(prog);
-const A = { pos: gl.getAttribLocation(prog,'aPosition'), nrm: gl.getAttribLocation(prog,'aNormal') };
-const U = {
-  model: gl.getUniformLocation(prog,'uModel'),
-  view: gl.getUniformLocation(prog,'uView'),
-  proj: gl.getUniformLocation(prog,'uProjection'),
-  nrmMat: gl.getUniformLocation(prog,'uNormalMatrix'),
-  color: gl.getUniformLocation(prog,'uColor'),
-  highlight: gl.getUniformLocation(prog,'uHighlight'),
-  opacity: gl.getUniformLocation(prog,'uOpacity'),
-  camPos: gl.getUniformLocation(prog,'uCamPos'),
-  sss: gl.getUniformLocation(prog,'uSSS'),
-  rough: gl.getUniformLocation(prog,'uRough')
-};
-
-/* ============================================================
-   4. 几何体
-   ============================================================ */
-function makeEllipsoid(rx, ry, rz, seg, rings){
-  const p=[],n=[],i=[];
-  for(let la=0;la<=rings;la++){
-    const th=la*Math.PI/rings, st=Math.sin(th), ct=Math.cos(th);
-    for(let lo=0;lo<=seg;lo++){
-      const ph=lo*2*Math.PI/seg, sp=Math.sin(ph), cp=Math.cos(ph);
-      p.push(rx*st*cp, ry*ct, rz*st*sp);
-      n.push(st*cp/rx, ct/ry, st*sp/rz);
-    }
-  }
-  for(let la=0;la<rings;la++) for(let lo=0;lo<seg;lo++){
-    const a=la*(seg+1)+lo, b=a+seg+1;
-    i.push(a,b,a+1, b,b+1,a+1);
-  }
-  for(let k=0;k<n.length;k+=3){
-    const l=Math.hypot(n[k],n[k+1],n[k+2])||1;
-    n[k]/=l; n[k+1]/=l; n[k+2]/=l;
-  }
-  return {p,n,i};
-}
-function makeSphere(r, seg, rings){ return makeEllipsoid(r, r, r, seg, rings||seg); }
-function makeRoundCapsule(r, h, seg, capRings){
-  const p=[],n=[],i=[];
-  const hh = h/2;
-  const rings = capRings || 4;
-  const finalRows = [];
-  for(let k=0;k<=rings;k++){
-    const t = k/rings;
-    const ang = -Math.PI/2 + t*Math.PI/2;
-    finalRows.push({ rr: r*Math.cos(ang), yy: -hh + r*Math.sin(-ang) });
-  }
-  finalRows.push({ rr: r, yy: -hh });
-  finalRows.push({ rr: r, yy: hh });
-  for(let k=0;k<=rings;k++){
-    const t = k/rings;
-    const ang = t*Math.PI/2;
-    finalRows.push({ rr: r*Math.cos(ang), yy: hh + r*Math.sin(ang) });
-  }
-  for(let ri=0;ri<finalRows.length;ri++){
-    const row = finalRows[ri];
-    for(let k=0;k<=seg;k++){
-      const ph = k*2*Math.PI/seg;
-      p.push(row.rr*Math.cos(ph), row.yy, row.rr*Math.sin(ph));
-    }
-  }
-  for(let ri=0;ri<finalRows.length-1;ri++){
-    for(let k=0;k<seg;k++){
-      const a = ri*(seg+1)+k;
-      const b = a+seg+1;
-      i.push(a,b,a+1, b,b+1,a+1);
-    }
-  }
-  for(let ri=0;ri<finalRows.length;ri++){
-    const row = finalRows[ri];
-    const dr = (ri > 0 && ri < finalRows.length-1)
-      ? (finalRows[ri+1].rr - finalRows[ri-1].rr)/2 : 0;
-    const dy = (ri > 0 && ri < finalRows.length-1)
-      ? (finalRows[ri+1].yy - finalRows[ri-1].yy)/2 : 0;
-    for(let k=0;k<=seg;k++){
-      const idx = (ri*(seg+1)+k)*3;
-      const ph = k*2*Math.PI/seg;
-      let nx = Math.cos(ph);
-      let nz = Math.sin(ph);
-      let ny = -dr / Math.max(0.001, Math.abs(dy) || 1);
-      const nl = Math.hypot(nx, ny, nz) || 1;
-      n[idx]=nx/nl; n[idx+1]=ny/nl; n[idx+2]=nz/nl;
-    }
-  }
-  return {p,n,i};
-}
-function makeLoft(profile, seg, cap){
-  const p=[],n=[],i=[];
-  const rows = profile.length;
-  for(let r=0;r<rows;r++){
-    const pr = profile[r];
-    for(let k=0;k<=seg;k++){
-      const ph = k*2*Math.PI/seg;
-      p.push(pr.rx * Math.cos(ph), pr.y, pr.rz * Math.sin(ph));
-      n.push(0, 0, 0);
-    }
-  }
-  for(let r=0;r<rows-1;r++){
-    for(let k=0;k<seg;k++){
-      const a = r*(seg+1)+k;
-      const b = a+seg+1;
-      i.push(a,b,a+1, b,b+1,a+1);
-    }
-  }
-  if(cap !== false){
-    const bc = p.length/3;
-    p.push(0, profile[0].y, 0);
-    n.push(0, -1, 0);
-    for(let k=0;k<seg;k++) i.push(bc, k+1, k);
-    const tc = p.length/3;
-    p.push(0, profile[rows-1].y, 0);
-    n.push(0, 1, 0);
-    const base = (rows-1)*(seg+1);
-    for(let k=0;k<seg;k++) i.push(tc, base+k, base+k+1);
-  }
-  for(let r=0;r<rows;r++){
-    const pr = profile[r];
-    let slopeX = 0, slopeZ = 0;
-    if(r > 0 && r < rows-1){
-      const prev = profile[r-1], next = profile[r+1];
-      const dy = Math.max(0.001, next.y - prev.y);
-      slopeX = (next.rx - prev.rx) / dy;
-      slopeZ = (next.rz - prev.rz) / dy;
-    }
-    for(let k=0;k<=seg;k++){
-      const idx = (r*(seg+1)+k)*3;
-      const ph = k*2*Math.PI/seg;
-      const ex = Math.cos(ph), ez = Math.sin(ph);
-      let nx = ex;
-      let ny = -(slopeX*ex*pr.rx + slopeZ*ez*pr.rz) / Math.max(0.01, Math.hypot(pr.rx, pr.rz));
-      let nz = ez;
-      const nl = Math.hypot(nx, ny, nz) || 1;
-      n[idx] = nx/nl; n[idx+1] = ny/nl; n[idx+2] = nz/nl;
-    }
-  }
-  return {p,n,i};
-}
-function buf(arr, type){
-  const b = gl.createBuffer();
-  gl.bindBuffer(type, b);
-  gl.bufferData(type, new Float32Array(arr), gl.STATIC_DRAW);
-  return b;
-}
-function ibuf(arr){
-  const b = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(arr), gl.STATIC_DRAW);
-  return b;
-}
-
-const GEOS = {};
-GEOS.sphere = makeSphere(1, 16, 12);
-GEOS.capsule = makeRoundCapsule(1, 1, 12, 3);
-
-const upperArmProfile = [
-  { y: -0.5,  rx: 0.32, rz: 0.32 }, { y: -0.2,  rx: 0.34, rz: 0.34 },
-  { y:  0.1,  rx: 0.35, rz: 0.35 }, { y:  0.3,  rx: 0.33, rz: 0.33 },
-  { y:  0.5,  rx: 0.30, rz: 0.30 }
-];
-GEOS.upperArm = makeLoft(upperArmProfile, 12, true);
-const forearmProfile = [
-  { y: -0.5,  rx: 0.20, rz: 0.20 }, { y: -0.2,  rx: 0.24, rz: 0.24 },
-  { y:  0.1,  rx: 0.26, rz: 0.26 }, { y:  0.3,  rx: 0.27, rz: 0.27 },
-  { y:  0.5,  rx: 0.28, rz: 0.28 }
-];
-GEOS.forearm = makeLoft(forearmProfile, 12, true);
-const thighProfile = [
-  { y: -0.5,  rx: 0.36, rz: 0.36 }, { y: -0.2,  rx: 0.42, rz: 0.42 },
-  { y:  0.1,  rx: 0.46, rz: 0.46 }, { y:  0.3,  rx: 0.46, rz: 0.46 },
-  { y:  0.5,  rx: 0.44, rz: 0.44 }
-];
-GEOS.thigh = makeLoft(thighProfile, 12, true);
-const shinProfile = [
-  { y: -0.5,  rx: 0.22, rz: 0.22 }, { y: -0.2,  rx: 0.30, rz: 0.30 },
-  { y:  0.1,  rx: 0.34, rz: 0.34 }, { y:  0.3,  rx: 0.32, rz: 0.32 },
-  { y:  0.5,  rx: 0.30, rz: 0.30 }
-];
-GEOS.shin = makeLoft(shinProfile, 12, true);
-const torsoProfile = [
-  { y: -1.6, rx: 0.90, rz: 0.65 }, { y: -1.2, rx: 1.05, rz: 0.72 },
-  { y: -0.8, rx: 1.08, rz: 0.74 }, { y: -0.4, rx: 0.98, rz: 0.70 },
-  { y:  0.0, rx: 0.88, rz: 0.62 }, { y:  0.4, rx: 0.92, rz: 0.66 },
-  { y:  0.8, rx: 1.05, rz: 0.74 }, { y:  1.2, rx: 1.18, rz: 0.82 },
-  { y:  1.6, rx: 1.20, rz: 0.78 }
-];
-GEOS.torso = makeLoft(torsoProfile, 16, true);
-GEOS.head = makeEllipsoid(1, 1.15, 0.98, 20, 14);
-GEOS.ellipsoid = makeEllipsoid(1, 1, 1, 12, 8);
-
-const BUFFERS = {};
-for(const name in GEOS){
-  const g = GEOS[name];
-  BUFFERS[name] = {
-    pos: buf(g.p, gl.ARRAY_BUFFER),
-    nrm: buf(g.n, gl.ARRAY_BUFFER),
-    idx: ibuf(g.i),
-    count: g.i.length
-  };
-}
-
-/* ============================================================
-   5. 渲染对象
-   ============================================================ */
-const tmpColor = new Float32Array(3);
-const tmpEye = new Float32Array(3);
-let renderObjects = [];
-
-function addObj(geo, color, pos, scl, opts){
-  opts = opts || {};
-  const m = mat4.create();
-  const rot = opts.rot || [0,0,0];
-  const sx = scl[0], sy = scl[1], sz = scl[2];
-  let r00=1,r01=0,r02=0,r10=0,r11=1,r12=0,r20=0,r21=0,r22=1;
-  if(rot[0] || rot[1] || rot[2]){
-    const cx=Math.cos(rot[0]), sx0=Math.sin(rot[0]);
-    const cy=Math.cos(rot[1]), sy0=Math.sin(rot[1]);
-    const cz=Math.cos(rot[2]), sz0=Math.sin(rot[2]);
-    r00 = cy*cz + sy0*sx0*sz0; r01 = -cy*sz0 + sy0*sx0*cz; r02 = sy0*cx;
-    r10 = cx*sz0;              r11 = cx*cz;                r12 = -sx0;
-    r20 = -sy0*cz + cy*sx0*sz0;r21 = sy0*sz0 + cy*sx0*cz;  r22 = cy*cx;
-  }
-  m[0]=r00*sx; m[1]=r10*sx; m[2]=r20*sx;
-  m[4]=r01*sy; m[5]=r11*sy; m[6]=r21*sy;
-  m[8]=r02*sz; m[9]=r12*sz; m[10]=r22*sz;
-  m[12]=pos[0]; m[13]=pos[1]; m[14]=pos[2];
-  renderObjects.push({
-    geo, color, model:m, pos, highlight:0,
-    opacity: opts.opacity !== undefined ? opts.opacity : 1,
-    sss: opts.sss !== undefined ? opts.sss : 0,
-    rough: opts.rough !== undefined ? opts.rough : 0.5
-  });
-}
-
-/* ============================================================
-   6. 相机
-   ============================================================ */
-const camera = {
-  distance: 6, yaw: 0.15, pitch: 0.1, target: [0, 1.2, 0],
-  autoRotate: true, autoSpeed: 0.00025,
-  getEye(){
-    const cp = Math.cos(this.pitch);
-    return [
-      this.target[0] + this.distance*cp*Math.sin(this.yaw),
-      this.target[1] + this.distance*Math.sin(this.pitch),
-      this.target[2] + this.distance*cp*Math.cos(this.yaw)
-    ];
-  }
-};
-let dragging = false, lastX=0, lastY=0;
-canvas.addEventListener('mousedown', e => { dragging=true; lastX=e.clientX; lastY=e.clientY; });
-window.addEventListener('mousemove', e => {
-  if(dragging){
-    const dx = e.clientX-lastX, dy = e.clientY-lastY;
-    camera.yaw -= dx*0.007;
-    camera.pitch = Math.max(-1.2, Math.min(1.2, camera.pitch + dy*0.007));
-    lastX = e.clientX; lastY = e.clientY;
-  }
-});
-window.addEventListener('mouseup', ()=> dragging=false);
-canvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  camera.distance = Math.max(1.5, Math.min(30, camera.distance + e.deltaY*0.005));
-}, {passive:false});
-canvas.addEventListener('touchstart', e => {
-  if(e.touches.length===1){ dragging=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; }
-}, {passive:true});
-canvas.addEventListener('touchmove', e => {
-  if(e.touches.length===1 && dragging){
-    const dx = e.touches[0].clientX-lastX, dy = e.touches[0].clientY-lastY;
-    camera.yaw -= dx*0.007;
-    camera.pitch = Math.max(-1.2, Math.min(1.2, camera.pitch + dy*0.007));
-    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-  }
-}, {passive:true});
-canvas.addEventListener('touchend', ()=> dragging=false);
-document.getElementById('autoRotate').addEventListener('change', e => camera.autoRotate = e.target.checked);
-
-/* ============================================================
-   7. 状态
+   2. 状态
    ============================================================ */
 const MAX_CELLS = 60;
 const STATE = {
   fatherGT: null, motherGT: null, zygoteGT: null, phenotype: null,
-  cells: [], stage: 0, divisions: 0, playing: false, playTimer: 0, speed: 1.0, animT: 0,
-  useRealModel: false
+  cells: [], stage: 0, divisions: 0, playing: false, playTimer: 0, speed: 1.0,
+  animT: 0, lastFrameTime: 0
 };
 const STAGES = [
-  { name:'受精卵', div:0 }, { name:'卵裂', div:4 }, { name:'桑葚胚', div:8 },
-  { name:'囊胚', div:16 }, { name:'原肠胚', div:28 }, { name:'器官发生', div:44 },
-  { name:'胎儿', div:54 }, { name:'完整个体', div:MAX_CELLS }
+  { name:'受精卵', div:0 },
+  { name:'卵裂', div:4 },
+  { name:'桑葚胚', div:8 },
+  { name:'囊胚', div:16 },
+  { name:'原肠胚', div:28 },
+  { name:'器官发生', div:44 },
+  { name:'胎儿', div:54 },
+  { name:'完整个体', div:MAX_CELLS }
 ];
 
 /* ============================================================
-   8. GLB 加载器 · 优化版
+   3. Canvas 细胞团绘制
    ============================================================ */
-const HUMAN_MODEL = { loaded: false, meshes: [], center: [0,0,0], size: 0 };
-const GLB_URL = 'https://yuxiaojiededian.github.io/xy.school.edu.github.io/bambino_gonfiabile.glb';
+const cellCanvas = document.getElementById('cellCanvas');
+const ctx = cellCanvas.getContext('2d');
 
-function parseGLB(arrayBuffer){
-  const view = new DataView(arrayBuffer);
-  const magic = view.getUint32(0, true);
-  if(magic !== 0x46546C67){ throw new Error('不是有效的 GLB 文件'); }
-  const version = view.getUint32(4, true);
-  const length = view.getUint32(8, true);
-  console.log('GLB 版本:', version, '总长度:', (length/1024/1024).toFixed(2) + ' MB');
-  let offset = 12, jsonChunk = null, binChunk = null;
-  while(offset < length){
-    const chunkLength = view.getUint32(offset, true);
-    const chunkType = view.getUint32(offset + 4, true);
-    const chunkStart = offset + 8;
-    if(chunkType === 0x4E4F534A){
-      jsonChunk = JSON.parse(new TextDecoder('utf-8').decode(new Uint8Array(arrayBuffer, chunkStart, chunkLength)));
-    } else if(chunkType === 0x004E4942){
-      binChunk = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
-    }
-    offset = chunkStart + chunkLength;
-    if(offset % 4 !== 0) offset += 4 - (offset % 4);
+function resizeCanvas(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cellCanvas.width = Math.floor(window.innerWidth * dpr);
+  cellCanvas.height = Math.floor(window.innerHeight * dpr);
+  cellCanvas.style.width = window.innerWidth + 'px';
+  cellCanvas.style.height = window.innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// 相机：让细胞团随鼠标拖动旋转（伪 3D）
+const cam = { yaw: 0.3, pitch: 0.2, dragging: false, lastX: 0, lastY: 0 };
+cellCanvas.addEventListener('mousedown', e => { cam.dragging = true; cam.lastX = e.clientX; cam.lastY = e.clientY; });
+window.addEventListener('mousemove', e => {
+  if(cam.dragging){
+    cam.yaw -= (e.clientX - cam.lastX) * 0.01;
+    cam.pitch += (e.clientY - cam.lastY) * 0.01;
+    cam.pitch = Math.max(-1, Math.min(1, cam.pitch));
+    cam.lastX = e.clientX; cam.lastY = e.clientY;
   }
-  if(!jsonChunk) throw new Error('GLB 缺少 JSON chunk');
-  if(!binChunk) throw new Error('GLB 缺少 BIN chunk');
-  return { gltf: jsonChunk, bin: binChunk };
+});
+window.addEventListener('mouseup', () => cam.dragging = false);
+
+// 3D 点投影到 2D
+function project(x, y, z){
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  // 先绕 Y 转，再绕 X 转
+  let x1 = x * cy + z * sy;
+  let z1 = -x * sy + z * cy;
+  let y1 = y * cp - z1 * sp;
+  let z2 = y * sp + z1 * cp;
+  // 透视投影
+  const focal = 800;
+  const scale = focal / (focal + z2 * 200);
+  return {
+    x: window.innerWidth / 2 + x1 * scale,
+    y: window.innerHeight / 2 + y1 * scale,
+    scale: scale
+  };
 }
 
-/* ---------- 优化的 readAccessor：TypedArray 直接映射 ---------- */
-function readAccessor(gltf, buffers, idx){
-  const acc = gltf.accessors[idx];
-  const bv  = gltf.bufferViews[acc.bufferView];
-  const buf = buffers[bv.buffer];
-  const base = (bv.byteOffset||0) + (acc.byteOffset||0);
+function drawCellCluster(){
+  const w = window.innerWidth, h = window.innerHeight;
+  ctx.clearRect(0, 0, w, h);
+  // 深色背景（跟 3D 一致）
+  ctx.fillStyle = '#0a0e1a';
+  ctx.fillRect(0, 0, w, h);
 
-  const ts = {SCALAR:1, VEC2:2, VEC3:3, VEC4:4}[acc.type];
-  const count = acc.count;
-  const total = count * ts;
-  const cs = {5126:4, 5123:2, 5125:4, 5121:1}[acc.componentType];
-  const stride = bv.byteStride || (ts * cs);
-
-  // 紧凑排列 → 直接映射（零拷贝）
-  if(stride === ts * cs){
-    if(acc.componentType === 5126){
-      return new Float32Array(buf, base, total).slice();
-    }
-    if(acc.componentType === 5123){
-      const src = new Uint16Array(buf, base, total);
-      const out = new Float32Array(total);
-      for(let i=0;i<total;i++) out[i] = src[i];
-      return out;
-    }
-    if(acc.componentType === 5125){
-      const src = new Uint32Array(buf, base, total);
-      const out = new Float32Array(total);
-      for(let i=0;i<total;i++) out[i] = src[i];
-      return out;
-    }
-    if(acc.componentType === 5121){
-      const src = new Uint8Array(buf, base, total);
-      const out = new Float32Array(total);
-      for(let i=0;i<total;i++) out[i] = src[i];
-      return out;
-    }
-  }
-
-  // stride 不紧凑 → 回退到逐元素
-  const view = new DataView(buf);
-  const out = new Float32Array(total);
-  for(let i=0;i<count;i++){
-    const o = base + i*stride;
-    for(let j=0;j<ts;j++){
-      const off = o + j*cs;
-      if(acc.componentType===5126) out[i*ts+j] = view.getFloat32(off,true);
-      else if(acc.componentType===5123) out[i*ts+j] = view.getUint16(off,true);
-      else if(acc.componentType===5125) out[i*ts+j] = view.getUint32(off,true);
-      else if(acc.componentType===5121) out[i*ts+j] = view.getUint8(off);
-    }
-  }
-  return out;
-}
-
-/* ---------- 直接读索引，不转 Float32 ---------- */
-function readIndices(gltf, buffers, idx){
-  const acc = gltf.accessors[idx];
-  const bv  = gltf.bufferViews[acc.bufferView];
-  const buf = buffers[bv.buffer];
-  const base = (bv.byteOffset||0) + (acc.byteOffset||0);
-  const count = acc.count;
-
-  if(acc.componentType === 5125){
-    return { array: new Uint32Array(buf, base, count).slice(), type: 5125 };
-  }
-  if(acc.componentType === 5123){
-    return { array: new Uint16Array(buf, base, count).slice(), type: 5123 };
-  }
-  if(acc.componentType === 5121){
-    const src = new Uint8Array(buf, base, count);
-    const out = new Uint16Array(count);
-    for(let i=0;i<count;i++) out[i] = src[i];
-    return { array: out, type: 5123 };
-  }
-  throw new Error('unsupported index componentType: ' + acc.componentType);
-}
-
-function classifyMesh(name){
-  const n = (name||'').toLowerCase();
-  if(n.includes('iris') || n.includes('pupil')) return 'iris';
-  if(n.includes('eye') && !n.includes('eyebrow') && !n.includes('eyelash')) return 'eye_white';
-  if(n.includes('eyelash') || n.includes('eyebrow') || n.includes('hair')) return 'hair';
-  if(n.includes('lip')) return 'lip';
-  if(n.includes('teeth') || n.includes('tooth') || n.includes('tongue')) return 'teeth';
-  if(n.includes('nail')) return 'nail';
-  return 'skin';
-}
-
-async function loadHumanModel(){
-  const info = document.getElementById('modelLoadInfo');
-  info.textContent = '加载 GLB 模型…';
-  const t0 = performance.now();
-  try {
-    const res = await fetch(GLB_URL);
-    if(!res.ok) throw new Error('GLB ' + res.status);
-    const arrayBuffer = await res.arrayBuffer();
-    const t1 = performance.now();
-    info.textContent = '解析 GLB (' + (arrayBuffer.byteLength/1024/1024).toFixed(1) + ' MB)…';
-
-    const { gltf, bin } = parseGLB(arrayBuffer);
-    const buffers = gltf.buffers.map(() => bin);
-    const t2 = performance.now();
-
-    info.textContent = '解析网格…';
-    const rawMeshes = [];
-    for(const mesh of gltf.meshes){
-      for(const prim of mesh.primitives){
-        const positions = readAccessor(gltf, buffers, prim.attributes.POSITION);
-        const normals = prim.attributes.NORMAL !== undefined
-          ? readAccessor(gltf, buffers, prim.attributes.NORMAL)
-          : new Float32Array(positions.length);
-        const indicesData = prim.indices !== undefined
-          ? readIndices(gltf, buffers, prim.indices) : null;
-        rawMeshes.push({
-          name: mesh.name||'mesh',
-          positions, normals,
-          indices: indicesData ? indicesData.array : null,
-          indexType: indicesData ? indicesData.type : 0
-        });
-      }
-    }
-    const t3 = performance.now();
-    console.log('原始网格数:', rawMeshes.length);
-
-    let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
-    for(const m of rawMeshes){
-      for(let i=0;i<m.positions.length;i+=3){
-        minX=Math.min(minX,m.positions[i]);   maxX=Math.max(maxX,m.positions[i]);
-        minY=Math.min(minY,m.positions[i+1]); maxY=Math.max(maxY,m.positions[i+1]);
-        minZ=Math.min(minZ,m.positions[i+2]); maxZ=Math.max(maxZ,m.positions[i+2]);
-      }
-    }
-    const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
-    const size = Math.max(maxX-minX, maxY-minY, maxZ-minZ);
-    console.log('模型包围盒 size:', size.toFixed(2), 'center:', cx.toFixed(2), cy.toFixed(2), cz.toFixed(2));
-
-    const sorted = rawMeshes.map(m => ({
-      m, tc: m.indices ? m.indices.length : m.positions.length/3
-    })).sort((a,b) => b.tc - a.tc);
-
-    const filtered = sorted.filter(x => x.tc >= 10).map(x => x.m);
-    console.log('保留网格数:', filtered.length, '/ 原始:', rawMeshes.length);
-
-    info.textContent = '上传 GPU (' + filtered.length + ' 网格)…';
-    HUMAN_MODEL.meshes = [];
-    for(const m of filtered){
-      const vbo = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-      const inter = new Float32Array(m.positions.length + m.normals.length);
-      for(let i=0;i<m.positions.length/3;i++){
-        inter[i*6+0]=m.positions[i*3+0];
-        inter[i*6+1]=m.positions[i*3+1];
-        inter[i*6+2]=m.positions[i*3+2];
-        inter[i*6+3]=m.normals[i*3+0];
-        inter[i*6+4]=m.normals[i*3+1];
-        inter[i*6+5]=m.normals[i*3+2];
-      }
-      gl.bufferData(gl.ARRAY_BUFFER, inter, gl.STATIC_DRAW);
-
-      let ibo=null, ic=0, hasIdx=false, useUint32=false;
-      if(m.indices){
-        ibo = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.indices, gl.STATIC_DRAW);
-        ic = m.indices.length; hasIdx = true;
-        useUint32 = (m.indexType === 5125);
-      } else { ic = m.positions.length/3; }
-
-      const cls = classifyMesh(m.name);
-      HUMAN_MODEL.meshes.push({
-        vbo, ibo, ic, hasIdx,
-        useUint32,
-        name: m.name, class: cls,
-        color: [0.92, 0.76, 0.66],
-        isSkin: cls === 'skin'
-      });
-    }
-
-    const t4 = performance.now();
-    console.log('⏱️ 下载 ' + (t1-t0).toFixed(0) + 'ms, 解析GLB ' + (t2-t1).toFixed(0) +
-                'ms, 遍历网格 ' + (t3-t2).toFixed(0) + 'ms, 上传GPU ' + (t4-t3).toFixed(0) + 'ms');
-
-    HUMAN_MODEL.loaded = true;
-    HUMAN_MODEL.center = [cx, cy, cz];
-    HUMAN_MODEL.size = size;
-    camera.target = [cx, cy, cz];
-    camera.distance = size * 2.2;
-
-    const totalMs = (t4 - t0).toFixed(0);
-    info.textContent = '✅ GLB 加载完成 (' + filtered.length + ' 网格, ' +
-      size.toFixed(2) + ' 单位高, 耗时 ' + totalMs + 'ms)';
-    setTimeout(()=> { info.style.opacity = '0'; }, 3500);
-
-    applyPhenotypeToModel();
-    buildAll();
-  } catch(e) {
-    console.error(e);
-    info.textContent = '❌ GLB 加载失败: ' + e.message + '\nURL: ' + GLB_URL;
-  }
-}
-
-function applyPhenotypeToModel(){
-  if(!HUMAN_MODEL.loaded) return;
   const p = STATE.phenotype;
-  if(!p) return;
-  for(const m of HUMAN_MODEL.meshes){
-    switch(m.class){
-      case 'iris':      m.color = p.eyeColor; break;
-      case 'eye_white': m.color = [0.96, 0.96, 0.97]; break;
-      case 'hair':      m.color = p.hairColor; break;
-      case 'lip':       m.color = [0.82, 0.42, 0.42]; break;
-      case 'teeth':     m.color = [0.95, 0.95, 0.93]; break;
-      case 'nail':      m.color = [0.92, 0.86, 0.82]; break;
-      default:          m.color = p.skinColor;
-    }
-  }
-}
+  const cells = STATE.cells;
+  // 按 z 排序，远的先画
+  const sorted = cells.map((c, i) => {
+    const pr = project(c.pos[0], -c.pos[1], c.pos[2]);
+    return { cell: c, pr };
+  }).sort((a, b) => a.pr.scale - b.pr.scale);
 
-function renderHumanModel(view, proj, eye){
-  gl.uniformMatrix4fv(U.view, false, view);
-  gl.uniformMatrix4fv(U.proj, false, proj);
-  tmpEye[0]=eye[0]; tmpEye[1]=eye[1]; tmpEye[2]=eye[2];
-  gl.uniform3fv(U.camPos, tmpEye);
-  const model = mat4.create();
-  gl.uniformMatrix4fv(U.model, false, model);
-  const nm = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
-  gl.uniformMatrix3fv(U.nrmMat, false, nm);
-  gl.disable(gl.CULL_FACE);
-  for(const m of HUMAN_MODEL.meshes){
-    gl.bindBuffer(gl.ARRAY_BUFFER, m.vbo);
-    gl.enableVertexAttribArray(A.pos);
-    gl.vertexAttribPointer(A.pos, 3, gl.FLOAT, false, 24, 0);
-    gl.enableVertexAttribArray(A.nrm);
-    gl.vertexAttribPointer(A.nrm, 3, gl.FLOAT, false, 24, 12);
-    gl.uniform3fv(U.color, new Float32Array(m.color));
-    gl.uniform1f(U.highlight, 0);
-    gl.uniform1f(U.opacity, 1);
-    gl.uniform1f(U.sss, m.isSkin ? 0.45 : 0);
-    gl.uniform1f(U.rough, m.isSkin ? 0.5 : 0.8);
-    if(m.hasIdx){
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ibo);
-      gl.drawElements(gl.TRIANGLES, m.ic, m.useUint32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
-    } else {
-      gl.drawArrays(gl.TRIANGLES, 0, m.ic);
-    }
+  for(const { cell, pr } of sorted){
+    // 颜色
+    let color;
+    if(cell.type === 'stem') color = [0.55, 0.85, 0.5];
+    else if(cell.type === 'ectoderm') color = [0.4, 0.7, 1.0];
+    else if(cell.type === 'mesoderm') color = [1.0, 0.5, 0.4];
+    else if(cell.type === 'endoderm') color = [0.5, 1.0, 0.6];
+    else if(cell.type === 'neuron') color = [0.9, 0.6, 0.85];
+    else if(cell.type === 'heart') color = [0.9, 0.2, 0.3];
+    else if(cell.type === 'lung') color = [0.86, 0.42, 0.58];
+    else if(cell.type === 'liver') color = [0.42, 0.12, 0.18];
+    else if(cell.type === 'stomach') color = [0.82, 0.48, 0.28];
+    else if(cell.type === 'intestine') color = [0.78, 0.72, 0.45];
+    else if(cell.type === 'kidney') color = [0.55, 0.28, 0.42];
+    else if(cell.type === 'muscle') color = [0.75, 0.25, 0.3];
+    else color = p.skinColor;
+
+    const r = cell.size * 40 * pr.scale;
+    // 径向渐变
+    const grd = ctx.createRadialGradient(pr.x - r*0.3, pr.y - r*0.3, r*0.1, pr.x, pr.y, r);
+    const rgb = `rgb(${Math.round(color[0]*255)},${Math.round(color[1]*255)},${Math.round(color[2]*255)})`;
+    const darker = `rgb(${Math.round(color[0]*180)},${Math.round(color[1]*180)},${Math.round(color[2]*180)})`;
+    grd.addColorStop(0, `rgba(${Math.round(color[0]*255+60)},${Math.round(color[1]*255+60)},${Math.round(color[2]*255+60)},1)`);
+    grd.addColorStop(0.7, rgb);
+    grd.addColorStop(1, darker);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(pr.x, pr.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 高光
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.arc(pr.x - r*0.3, pr.y - r*0.3, r*0.25, 0, Math.PI * 2);
+    ctx.fill();
   }
-  gl.enable(gl.CULL_FACE);
 }
 
 /* ============================================================
-   9. 场景初始化
+   4. 图片应用（后期阶段）
+   ============================================================ */
+const imgWrap = document.getElementById('imgWrap');
+const humanImg = document.getElementById('humanImg');
+
+function applyPhenotypeToImage(){
+  const p = STATE.phenotype;
+  if(!p) return;
+
+  // 用 CSS filter 改肤色和发色
+  // 思路：将图片整体做 brightness/saturate/hue-rotate
+
+  // 肤色：根据 skinScore 调 brightness 和 saturate
+  const skinBrightness = 0.6 + (1 - p.skinScore/6) * 0.5;  // 0.6 ~ 1.1
+  const skinSaturate = 0.7 + (1 - p.skinScore/6) * 0.5;    // 0.7 ~ 1.2
+
+  // 发色：根据发色偏向调 hue-rotate
+  let hueRotate = 0;
+  if(p.hairLabel === '红发') hueRotate = -20;
+  else if(p.hairLabel === '金发') hueRotate = 20;
+  else if(p.hairLabel === '深棕') hueRotate = 5;
+  else hueRotate = 0; // 乌黑
+
+  // 身高：scaleY
+  const heightScale = p.heightM / 1.7;   // 1.55/1.7 ~ 1.98/1.7
+  // 体型：scaleX
+  const widthScale = 0.9 + p.bodyType * 0.1;
+
+  humanImg.style.filter = `brightness(${skinBrightness}) saturate(${skinSaturate}) hue-rotate(${hueRotate}deg)`;
+  humanImg.style.transform = `scaleY(${heightScale}) scaleX(${widthScale})`;
+}
+
+/* ============================================================
+   5. 场景初始化
    ============================================================ */
 function initScene(){
   STATE.fatherGT = GeneEngine.randomIndividual(0.6);
@@ -1039,19 +503,36 @@ function initScene(){
   const egg = GeneEngine.randomGamete(STATE.motherGT);
   STATE.zygoteGT = GeneEngine.fertilize(sperm, egg);
   STATE.phenotype = GeneEngine.getPhenotype(STATE.zygoteGT);
-  STATE.cells = [{ pos:[0,4,0], type:'stem', size:1.8, generation:0 }];
+  STATE.cells = [{ pos:[0,0,0], type:'stem', size:1.8, generation:0 }];
   STATE.stage = 0;
   STATE.divisions = 0;
   STATE.playing = false;
   STATE.playTimer = 0;
   STATE.animT = 0;
-  buildAll();
+  updateStageDisplay();
   updateUI();
   updateGenePanel();
 }
 
 /* ============================================================
-   10. 基因面板
+   6. 阶段显示：0-4 用 Canvas，5+ 用图片
+   ============================================================ */
+function updateStageDisplay(){
+  const stage = STATE.stage;
+  if(stage >= 5){
+    // 显示图片
+    cellCanvas.style.display = 'none';
+    imgWrap.classList.add('show');
+    applyPhenotypeToImage();
+  } else {
+    // 显示 Canvas 细胞团
+    cellCanvas.style.display = 'block';
+    imgWrap.classList.remove('show');
+  }
+}
+
+/* ============================================================
+   7. 基因面板
    ============================================================ */
 function updateGenePanel(){
   const p = STATE.phenotype;
@@ -1117,140 +598,7 @@ function updateGenePanel(){
 function rgbStr(c){ return `rgb(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)})`; }
 
 /* ============================================================
-   11. 构建
-   ============================================================ */
-function buildAll(){
-  renderObjects = [];
-  const stage = STATE.stage;
-  if(stage <= 4){ addCellCluster(false); return; }
-  if(HUMAN_MODEL.loaded){ STATE.useRealModel = true; return; }
-  STATE.useRealModel = false;
-  const showSkin = document.getElementById('showSkin').checked;
-  const showOrgans = document.getElementById('showOrgans').checked;
-  const showSkeleton = document.getElementById('showSkeleton').checked;
-  const showCells = document.getElementById('showCells').checked;
-  if(showSkeleton) addSkeleton();
-  if(showOrgans) addOrgans();
-  if(showSkin) addBody();
-  if(showCells) addCellCluster(true);
-}
-
-function addCellCluster(insideBody){
-  const cells = STATE.cells;
-  const n = cells.length;
-  const p = STATE.phenotype;
-  for(let i=0;i<n;i++){
-    const cell = cells[i];
-    let pos;
-    if(insideBody){
-      const a = (i / n) * Math.PI * 2 * 3.7;
-      const r = 0.3 + (i % 7) * 0.15;
-      const y = 2.0 + (i % 5 - 2) * 0.6;
-      pos = [ Math.cos(a)*r*0.7, y, Math.sin(a)*r*0.5 ];
-    } else {
-      pos = cell.pos;
-    }
-    const col = cell.type === 'stem' ? [0.55,0.85,0.5] : p.skinColor;
-    addObj('sphere', col, pos, [cell.size*0.8, cell.size*0.8, cell.size*0.8], { opacity: 0.9 });
-  }
-}
-
-function addSkeleton(){
-  const p = STATE.phenotype;
-  const h = p.heightM / 1.7;
-  const boneCol = [0.93,0.91,0.85];
-  addObj('capsule', boneCol, [0, 3.0*h, -0.35], [0.12, 3.6*h, 0.12], { rough:0.6 });
-  addObj('head', boneCol, [0, 7.35*h, 0], [0.9, 1.0, 0.88], { rough:0.55 });
-  addObj('ellipsoid', boneCol, [0, 1.5*h, 0], [0.85, 0.5, 0.6], { rough:0.55 });
-  const armAngle = Math.atan2(2.0-1.55, 5.2-3.4);
-  const forearmAngle = Math.atan2(2.2-2.0, 3.4-1.7);
-  addObj('upperArm', boneCol, [1.55, 4.6*h, 0], [0.25, 1.9*h, 0.25], { rot:[0,0,armAngle], rough:0.6 });
-  addObj('upperArm', boneCol, [-1.55,4.6*h, 0], [0.25, 1.9*h, 0.25], { rot:[0,0,-armAngle], rough:0.6 });
-  addObj('forearm', boneCol, [1.85, 2.85*h, 0], [0.24, 1.75*h, 0.24], { rot:[0,0,forearmAngle], rough:0.6 });
-  addObj('forearm', boneCol, [-1.85,2.85*h, 0], [0.24, 1.75*h, 0.24], { rot:[0,0,-forearmAngle], rough:0.6 });
-  addObj('thigh', boneCol, [0.62,-0.4*h,0], [0.22, 2.4*h, 0.22], { rough:0.6 });
-  addObj('thigh', boneCol, [-0.62,-0.4*h,0],[0.22, 2.4*h, 0.22], { rough:0.6 });
-  addObj('shin', boneCol, [0.62,-2.95*h,0], [0.22, 2.1*h, 0.22], { rough:0.6 });
-  addObj('shin', boneCol, [-0.62,-2.95*h,0],[0.22, 2.1*h, 0.22], { rough:0.6 });
-}
-
-function addBody(){
-  const p = STATE.phenotype;
-  const skin = p.skinColor;
-  const h = p.heightM / 1.7;
-  const bodyW = 1 + p.bodyType * 0.06;
-  const shoulderW = p.shoulderWidth * 0.55;
-  const CENTER_Y = 2.0 * h;
-  const SHOULDER_Y = CENTER_Y + 1.55 * h;
-  const NECK_Y = CENTER_Y + 1.7 * h;
-  const HEAD_Y = CENTER_Y + 2.55 * h;
-  const HEAD_R = 0.52 * h;
-  addObj('torso', skin, [0, CENTER_Y, 0], [bodyW, 1.6*h, bodyW], { sss:0.35, rough:0.55 });
-  addObj('capsule', skin, [0, NECK_Y, 0], [0.28, 0.5*h, 0.28], { sss:0.4, rough:0.5 });
-  addObj('head', skin, [0, HEAD_Y, 0], [HEAD_R*p.faceWidth, HEAD_R*1.15, HEAD_R*0.98], { sss:0.5, rough:0.5 });
-  addObj('sphere', skin, [0, HEAD_Y-0.3*h, 0.28], [HEAD_R*0.72*p.faceWidth, 0.18, 0.25], { sss:0.5, rough:0.5 });
-  const eyeY = HEAD_Y + 0.12*h;
-  const eyeZ = HEAD_R*0.88;
-  const eyeGap = p.eyeGap * 0.55;
-  const eyeSize = p.eyeSize * 1.6;
-  addObj('sphere', [0.96,0.96,0.97], [eyeGap, eyeY, eyeZ], [eyeSize, eyeSize, eyeSize], { rough:0.2 });
-  addObj('sphere', [0.96,0.96,0.97], [-eyeGap,eyeY, eyeZ], [eyeSize, eyeSize, eyeSize], { rough:0.2 });
-  const iris = eyeSize * 0.6;
-  addObj('sphere', p.eyeColor, [eyeGap, eyeY, eyeZ+eyeSize*0.82], [iris, iris, iris*0.3], { rough:0.15 });
-  addObj('sphere', p.eyeColor, [-eyeGap,eyeY, eyeZ+eyeSize*0.82], [iris, iris, iris*0.3], { rough:0.15 });
-  const lipY = HEAD_Y - 0.22*h;
-  addObj('sphere', [0.84,0.44,0.44], [0, lipY+0.02, HEAD_R*0.92], [0.14, p.lipThickness*0.5, 0.08], { sss:0.6, rough:0.35 });
-  addObj('sphere', [0.78,0.38,0.38], [0, lipY-0.02, HEAD_R*0.92], [0.12, p.lipThickness*0.55, 0.07], { sss:0.6, rough:0.35 });
-  addObj('head', p.hairColor, [0, HEAD_Y+0.15*h, -0.05], [HEAD_R*1.1*p.faceWidth, HEAD_R*1.1, HEAD_R*1.1], { rough:0.9 });
-  addObj('sphere', skin, [shoulderW, SHOULDER_Y, 0], [0.25, 0.26, 0.26], { sss:0.3, rough:0.5 });
-  addObj('sphere', skin, [-shoulderW,SHOULDER_Y, 0], [0.25, 0.26, 0.26], { sss:0.3, rough:0.5 });
-  const ELBOW_Y = SHOULDER_Y - 1.15*h;
-  const ARM_X = shoulderW + 0.15;
-  const armLen = SHOULDER_Y - ELBOW_Y;
-  addObj('upperArm', skin, [ARM_X, (SHOULDER_Y + ELBOW_Y)/2, 0], [0.9, armLen, 0.9], { sss:0.25, rough:0.55 });
-  addObj('upperArm', skin, [-ARM_X,(SHOULDER_Y + ELBOW_Y)/2, 0], [0.9, armLen, 0.9], { sss:0.25, rough:0.55 });
-  const WRIST_Y = ELBOW_Y - 1.0*h;
-  const forearmLen = ELBOW_Y - WRIST_Y;
-  addObj('forearm', skin, [ARM_X, (ELBOW_Y + WRIST_Y)/2, 0], [0.85, forearmLen, 0.85], { sss:0.25, rough:0.55 });
-  addObj('forearm', skin, [-ARM_X,(ELBOW_Y + WRIST_Y)/2, 0], [0.85, forearmLen, 0.85], { sss:0.25, rough:0.55 });
-  const HAND_Y = WRIST_Y - 0.15*h;
-  addObj('sphere', skin, [ARM_X, HAND_Y, 0], [0.14, 0.2, 0.08], { sss:0.3, rough:0.55 });
-  addObj('sphere', skin, [-ARM_X,HAND_Y, 0], [0.14, 0.2, 0.08], { sss:0.3, rough:0.55 });
-  const HIP_Y = CENTER_Y - 0.8*h;
-  addObj('sphere', skin, [0.35*bodyW, HIP_Y, 0], [0.28, 0.3, 0.3], { sss:0.3, rough:0.5 });
-  addObj('sphere', skin, [-0.35*bodyW,HIP_Y, 0], [0.28, 0.3, 0.3], { sss:0.3, rough:0.5 });
-  const CROTCH_Y = CENTER_Y - 1.5*h;
-  const KNEE_Y = CROTCH_Y - 1.5*h*p.legLength*0.5;
-  const THIGH_X = 0.35*bodyW;
-  const thighLen = HIP_Y - KNEE_Y;
-  addObj('thigh', skin, [THIGH_X, (HIP_Y + KNEE_Y)/2, 0], [1.0, thighLen, 1.0], { sss:0.25, rough:0.55 });
-  addObj('thigh', skin, [-THIGH_X,(HIP_Y + KNEE_Y)/2, 0], [1.0, thighLen, 1.0], { sss:0.25, rough:0.55 });
-  const ANKLE_Y = KNEE_Y - 1.3*h*p.legLength*0.7;
-  const shinLen = KNEE_Y - ANKLE_Y;
-  addObj('shin', skin, [THIGH_X, (KNEE_Y + ANKLE_Y)/2, 0], [1.0, shinLen, 1.0], { sss:0.2, rough:0.55 });
-  addObj('shin', skin, [-THIGH_X,(KNEE_Y + ANKLE_Y)/2, 0], [1.0, shinLen, 1.0], { sss:0.2, rough:0.55 });
-  const FOOT_Y = ANKLE_Y - 0.08*h;
-  addObj('sphere', skin, [THIGH_X, FOOT_Y, 0.12], [0.13, 0.08, 0.28], { sss:0.25, rough:0.55 });
-  addObj('sphere', skin, [-THIGH_X,FOOT_Y, 0.12], [0.13, 0.08, 0.28], { sss:0.25, rough:0.55 });
-}
-
-function addOrgans(){
-  const p = STATE.phenotype;
-  const h = p.heightM / 1.7;
-  const CENTER_Y = 2.0 * h;
-  addObj('sphere', [0.86,0.68,0.74], [0.2, CENTER_Y + 2.8*h, 0], [0.36, 0.35, 0.42], { rough:0.7 });
-  addObj('sphere', [0.78,0.12,0.18], [0.15, CENTER_Y + 1.15*h, 0.25], [0.22, 0.24, 0.22], { rough:0.35 });
-  addObj('sphere', [0.86,0.42,0.58], [0.4, CENTER_Y + 1.15*h, 0], [0.24, 0.38, 0.24], { rough:0.6 });
-  addObj('sphere', [0.42,0.12,0.18], [0.25, CENTER_Y + 0.5*h, 0.2], [0.35, 0.25, 0.28], { rough:0.5 });
-  for(let i=0;i<3;i++){
-    const y = CENTER_Y - 0.3*h - i*0.2*h;
-    addObj('capsule', [0.78,0.72,0.45], [0, y, 0.1], [0.14, 0.28, 0.14], { rot:[0,0,(i%2? 0.5:-0.5)], rough:0.6 });
-  }
-  addObj('sphere', [0.55,0.28,0.42], [0.3, CENTER_Y + 0.15*h, -0.2], [0.13, 0.17, 0.13], { rough:0.55 });
-}
-
-/* ============================================================
-   12. 分裂 & 阶段
+   8. 分裂 & 阶段
    ============================================================ */
 function doDivision(){
   if(STATE.cells.length >= MAX_CELLS){ STATE.divisions++; return; }
@@ -1259,9 +607,19 @@ function doDivision(){
     if(newCells.length + 1 >= MAX_CELLS){ newCells.push(cell); continue; }
     for(const s of [-1, 1]){
       if(newCells.length >= MAX_CELLS) break;
+      // 分裂方向：随机但稍微向外
+      const dx = (Math.random() - 0.5) * 0.6 + cell.pos[0] * 0.3;
+      const dy = (Math.random() - 0.5) * 0.6 + cell.pos[1] * 0.3;
+      const dz = (Math.random() - 0.5) * 0.6 + cell.pos[2] * 0.3;
       newCells.push({
-        pos: [cell.pos[0]+(Math.random()-0.5)*0.4, cell.pos[1]+(Math.random()-0.5)*0.4, cell.pos[2]+(Math.random()-0.5)*0.4],
-        type: cell.type, size: cell.size * 0.9, generation: cell.generation + 1
+        pos: [
+          cell.pos[0] + dx * 0.4,
+          cell.pos[1] + dy * 0.4,
+          cell.pos[2] + dz * 0.4
+        ],
+        type: cell.type,
+        size: cell.size * 0.9,
+        generation: cell.generation + 1
       });
     }
   }
@@ -1281,29 +639,27 @@ function advanceStage(){
     else if(stage <= 4) cell.type = i%3===0 ? 'ectoderm' : (i%3===1 ? 'mesoderm' : 'endoderm');
     else {
       const y = cell.pos[1];
-      if(y > 3) cell.type = 'neuron';
-      else if(y > 1) cell.type = i%2===0 ? 'heart' : 'lung';
-      else if(y > -1) cell.type = i%2===0 ? 'liver' : 'stomach';
-      else if(y > -3) cell.type = i%2===0 ? 'intestine' : 'kidney';
+      if(y > 1) cell.type = 'neuron';
+      else if(y > 0.3) cell.type = i%2===0 ? 'heart' : 'lung';
+      else if(y > -0.3) cell.type = i%2===0 ? 'liver' : 'stomach';
+      else if(y > -1) cell.type = i%2===0 ? 'intestine' : 'kidney';
       else cell.type = 'muscle';
     }
     cell.size = Math.max(0.3, cell.size * 0.92);
   }
-  applyPhenotypeToModel();
-  buildAll();
+  updateStageDisplay();
   updateUI();
   showTitle(STAGES[STATE.stage].name);
 }
-function resetAll(){ initScene(); applyPhenotypeToModel(); showTitle('重新随机基因'); }
+function resetAll(){ initScene(); showTitle('重新随机基因'); }
 
 /* ============================================================
-   13. UI
+   9. UI
    ============================================================ */
 function updateUI(){
   const p = STATE.phenotype;
   document.getElementById('statSex').textContent = p.sexLabel;
   document.getElementById('statHeight').textContent = p.heightLabel;
-  document.getElementById('statCells').textContent = STATE.cells.length;
   document.getElementById('statStage').textContent = STAGES[STATE.stage].name;
   document.querySelectorAll('.stage-node').forEach((n,i)=>{
     n.classList.toggle('active', i === STATE.stage);
@@ -1323,7 +679,7 @@ function showTitle(text){
 }
 
 /* ============================================================
-   14. 事件
+   10. 事件
    ============================================================ */
 document.getElementById('btnPlay').addEventListener('click', ()=>{ STATE.playing = !STATE.playing; updateUI(); });
 document.getElementById('btnStep').addEventListener('click', advanceStage);
@@ -1334,14 +690,11 @@ document.querySelectorAll('.stage-node').forEach(n=>{
     while(STATE.stage < target) advanceStage();
   });
 });
-['showSkin','showOrgans','showSkeleton','showCells'].forEach(id=>{
-  document.getElementById(id).addEventListener('change', buildAll);
-});
 
 /* ============================================================
-   15. F5
+   11. F5 切换 UI
    ============================================================ */
-const UI_SELECTORS = ['#topBar','#genePanel','#controlPanel','#timeline','#f5Badge'];
+const UI_SELECTORS = ['#topBar','#genePanel','#timeline','#f5Badge'];
 const uiHint = document.getElementById('uiHint');
 let uiHidden = false;
 function toggleUI(){
@@ -1359,21 +712,19 @@ window.addEventListener('keydown', e => {
 });
 
 /* ============================================================
-   16. 渲染循环
+   12. 渲染循环
    ============================================================ */
-let lastTime = 0, frameCount = 0, fpsAcc = 0, fpsTimer = 0;
 function frame(time){
   time = time || 0;
-  const dt = Math.min(50, time - lastTime);
-  lastTime = time;
-  frameCount++; fpsAcc += dt; fpsTimer += dt;
-  if(fpsTimer > 500){
-    document.getElementById('statFps').textContent = Math.round(1000 / (fpsAcc / frameCount));
-    frameCount = 0; fpsAcc = 0; fpsTimer = 0;
-  }
-  if(camera.autoRotate && !dragging) camera.yaw += camera.autoSpeed * (dt || 16);
+  const dt = Math.min(50, time - STATE.lastFrameTime);
+  STATE.lastFrameTime = time;
+
+  // 自动旋转
+  if(!cam.dragging) cam.yaw += 0.0003 * (dt || 16);
+
+  // 播放
   if(STATE.playing){
-    STATE.playTimer += dt * STATE.speed;
+    STATE.playTimer += dt;
     if(STATE.playTimer > 900){
       STATE.playTimer = 0;
       advanceStage();
@@ -1381,88 +732,19 @@ function frame(time){
       updateUI();
     }
   }
-  STATE.animT += dt;
 
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-  const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-  if(canvas.width !== w || canvas.height !== h){
-    canvas.width = w; canvas.height = h;
-    gl.viewport(0,0,w,h);
-  }
-  gl.enable(gl.DEPTH_TEST);
-  gl.depthFunc(gl.LEQUAL);
-  gl.enable(gl.CULL_FACE);
-  gl.cullFace(gl.BACK);
-  gl.disable(gl.BLEND);
-  gl.clearColor(0.04, 0.06, 0.12, 1.0);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  const asp = canvas.width / Math.max(1, canvas.height);
-  const proj = mat4.create();
-  mat4.perspective(proj, Math.PI/4, asp, 0.1, 200);
-  const view = mat4.create();
-  const eye = camera.getEye();
-  mat4.lookAt(view, eye, camera.target, [0,1,0]);
-
-  if(HUMAN_MODEL.loaded && STATE.useRealModel){
-    renderHumanModel(view, proj, eye);
-    requestAnimationFrame(frame);
-    return;
+  // 早期阶段：画细胞团
+  if(STATE.stage <= 4){
+    drawCellCluster();
   }
 
-  gl.uniformMatrix4fv(U.proj, false, proj);
-  gl.uniformMatrix4fv(U.view, false, view);
-  tmpEye[0]=eye[0]; tmpEye[1]=eye[1]; tmpEye[2]=eye[2];
-  gl.uniform3fv(U.camPos, tmpEye);
-
-  const groups = {};
-  for(const o of renderObjects){
-    if(!groups[o.geo]) groups[o.geo] = [];
-    groups[o.geo].push(o);
-  }
-  for(const geoName in groups){
-    const list = groups[geoName];
-    const b = BUFFERS[geoName];
-    if(!b) continue;
-    gl.bindBuffer(gl.ARRAY_BUFFER, b.pos);
-    gl.vertexAttribPointer(A.pos, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(A.pos);
-    gl.bindBuffer(gl.ARRAY_BUFFER, b.nrm);
-    gl.vertexAttribPointer(A.nrm, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(A.nrm);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.idx);
-    for(const o of list){
-      gl.uniformMatrix4fv(U.model, false, o.model);
-      const nm = mat4.create();
-      if(!mat4.invert(nm, o.model)) nm.set([1,0,0,0,1,0,0,0,1]);
-      else mat4.transpose3(nm);
-      gl.uniformMatrix3fv(U.nrmMat, false, nm);
-      tmpColor[0]=o.color[0]; tmpColor[1]=o.color[1]; tmpColor[2]=o.color[2];
-      gl.uniform3fv(U.color, tmpColor);
-      gl.uniform1f(U.highlight, o.highlight);
-      gl.uniform1f(U.opacity, o.opacity);
-      gl.uniform1f(U.sss, o.sss || 0);
-      gl.uniform1f(U.rough, o.rough || 0.5);
-      gl.drawElements(gl.TRIANGLES, b.count, gl.UNSIGNED_SHORT, 0);
-    }
-  }
   requestAnimationFrame(frame);
 }
 
 /* ============================================================
-   17. 启动
+   13. 启动
    ============================================================ */
-function resize(){
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-  canvas.height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-  gl.viewport(0,0,canvas.width,canvas.height);
-}
-window.addEventListener('resize', resize);
-resize();
 initScene();
-loadHumanModel();
 requestAnimationFrame(frame);
 
 })();

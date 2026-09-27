@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>基因决定外貌 · 3D 人体发育模拟</title>
+<title>基因决定外貌 · 发育模拟</title>
 <style>
 :root {
   --blue: #2563EB;
@@ -24,14 +24,15 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
   display:flex; align-items:center; justify-content:center;
   overflow:hidden;
 }
-#glCanvas {
+#cellCanvas {
   position:absolute; top:0; left:0; width:100%; height:100%;
-  display:block;
+  display:block; cursor:grab;
 }
+#cellCanvas:active { cursor:grabbing; }
 #imgWrap {
   position:absolute;
-  width:min(70vh, 60vw);
-  height:min(70vh, 60vw);
+  width:min(75vh, 65vw);
+  height:min(75vh, 65vw);
   display:none;
   align-items:center; justify-content:center;
   transition:opacity .6s ease;
@@ -41,13 +42,8 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
   max-width:100%;
   max-height:100%;
   object-fit:contain;
-  transition:filter .6s ease, transform .6s cubic-bezier(.4,0,.2,1);
-  filter: brightness(1) saturate(1) hue-rotate(0deg);
-  transform: scaleY(1) scaleX(1);
-}
-#cellCanvas {
-  position:absolute; top:0; left:0; width:100%; height:100%;
-  display:block;
+  transition:transform .6s cubic-bezier(.4,0,.2,1);
+  transform-origin: center bottom;
 }
 
 /* ===== UI ===== */
@@ -142,6 +138,11 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
   background:rgba(30,41,59,.85); backdrop-filter:blur(8px); border-radius:18px;
   color:var(--blue-light); font-size:.68rem; font-family:'SF Mono',Consolas,monospace;
   transition:opacity .35s; pointer-events:none; }
+#loadInfo { position:fixed; top:64px; left:50%; transform:translateX(-50%);
+  background:rgba(30,41,59,.85); backdrop-filter:blur(8px); color:var(--blue-light);
+  font:12px 'SF Mono',Consolas,monospace; padding:8px 16px; border-radius:8px;
+  z-index:100; max-width:90vw; white-space:pre; text-align:center;
+  pointer-events:none; transition:opacity .4s; line-height:1.5; }
 .ui-hidden { opacity: 0 !important; pointer-events: none !important; }
 @media (max-width:1200px) {
   #genePanel { width:240px; }
@@ -164,6 +165,7 @@ body { background:#0a0e1a; overflow:hidden; width:100vw; height:100vh; color:var
 </div>
 
 <div id="f5Badge">按 F5 切换 UI</div>
+<div id="loadInfo">初始化…</div>
 
 <div id="topBar" class="card">
   <h1>基因决定外貌 · 发育模拟</h1>
@@ -269,6 +271,7 @@ const GeneEngine = {
       for(const a of gt[k]) if(a === l.dom) skinScore++;
     }
     p.skinScore = skinScore;
+    // 7 档肤色，从极浅到极深
     const tones = [
       [0.98,0.86,0.78],[0.96,0.82,0.72],[0.92,0.76,0.64],
       [0.85,0.68,0.55],[0.72,0.54,0.42],[0.56,0.38,0.28],[0.38,0.24,0.16]
@@ -375,8 +378,7 @@ function resizeCanvas(){
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// 相机：让细胞团随鼠标拖动旋转（伪 3D）
-const cam = { yaw: 0.3, pitch: 0.2, dragging: false, lastX: 0, lastY: 0 };
+const cam = { yaw: 0.3, pitch: 0.2, dragging: false, lastX: 0, lastY: 0, autoRotate: true };
 cellCanvas.addEventListener('mousedown', e => { cam.dragging = true; cam.lastX = e.clientX; cam.lastY = e.clientY; });
 window.addEventListener('mousemove', e => {
   if(cam.dragging){
@@ -388,16 +390,13 @@ window.addEventListener('mousemove', e => {
 });
 window.addEventListener('mouseup', () => cam.dragging = false);
 
-// 3D 点投影到 2D
 function project(x, y, z){
   const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-  // 先绕 Y 转，再绕 X 转
   let x1 = x * cy + z * sy;
   let z1 = -x * sy + z * cy;
   let y1 = y * cp - z1 * sp;
   let z2 = y * sp + z1 * cp;
-  // 透视投影
   const focal = 800;
   const scale = focal / (focal + z2 * 200);
   return {
@@ -410,20 +409,17 @@ function project(x, y, z){
 function drawCellCluster(){
   const w = window.innerWidth, h = window.innerHeight;
   ctx.clearRect(0, 0, w, h);
-  // 深色背景（跟 3D 一致）
   ctx.fillStyle = '#0a0e1a';
   ctx.fillRect(0, 0, w, h);
 
   const p = STATE.phenotype;
   const cells = STATE.cells;
-  // 按 z 排序，远的先画
   const sorted = cells.map((c, i) => {
     const pr = project(c.pos[0], -c.pos[1], c.pos[2]);
     return { cell: c, pr };
   }).sort((a, b) => a.pr.scale - b.pr.scale);
 
   for(const { cell, pr } of sorted){
-    // 颜色
     let color;
     if(cell.type === 'stem') color = [0.55, 0.85, 0.5];
     else if(cell.type === 'ectoderm') color = [0.4, 0.7, 1.0];
@@ -440,11 +436,10 @@ function drawCellCluster(){
     else color = p.skinColor;
 
     const r = cell.size * 40 * pr.scale;
-    // 径向渐变
     const grd = ctx.createRadialGradient(pr.x - r*0.3, pr.y - r*0.3, r*0.1, pr.x, pr.y, r);
     const rgb = `rgb(${Math.round(color[0]*255)},${Math.round(color[1]*255)},${Math.round(color[2]*255)})`;
     const darker = `rgb(${Math.round(color[0]*180)},${Math.round(color[1]*180)},${Math.round(color[2]*180)})`;
-    grd.addColorStop(0, `rgba(${Math.round(color[0]*255+60)},${Math.round(color[1]*255+60)},${Math.round(color[2]*255+60)},1)`);
+    grd.addColorStop(0, `rgba(${Math.min(255, Math.round(color[0]*255+60))},${Math.min(255, Math.round(color[1]*255+60))},${Math.min(255, Math.round(color[2]*255+60))},1)`);
     grd.addColorStop(0.7, rgb);
     grd.addColorStop(1, darker);
     ctx.fillStyle = grd;
@@ -452,7 +447,6 @@ function drawCellCluster(){
     ctx.arc(pr.x, pr.y, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // 高光
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.beginPath();
     ctx.arc(pr.x - r*0.3, pr.y - r*0.3, r*0.25, 0, Math.PI * 2);
@@ -461,35 +455,131 @@ function drawCellCluster(){
 }
 
 /* ============================================================
-   4. 图片应用（后期阶段）
+   4. 图片逐像素换肤
    ============================================================ */
 const imgWrap = document.getElementById('imgWrap');
 const humanImg = document.getElementById('humanImg');
+const loadInfo = document.getElementById('loadInfo');
+let originalImageData = null;
+let imageLoaded = false;
+const skinCache = new Map();
+
+humanImg.onload = () => {
+  const c = document.createElement('canvas');
+  c.width = humanImg.naturalWidth;
+  c.height = humanImg.naturalHeight;
+  const cx2 = c.getContext('2d');
+  cx2.drawImage(humanImg, 0, 0);
+  originalImageData = cx2.getImageData(0, 0, c.width, c.height);
+  imageLoaded = true;
+  loadInfo.textContent = '✅ 图片已加载 (' + c.width + '×' + c.height + ')';
+  setTimeout(()=> { loadInfo.style.opacity = '0'; }, 2500);
+  applyPhenotypeToImage();
+};
+humanImg.onerror = () => {
+  loadInfo.textContent = '❌ 图片加载失败，检查胎儿1.png';
+};
+
+function rgb2hsv(r, g, b){
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if(d !== 0){
+    if(max === r) h = ((g - b) / d) % 6;
+    else if(max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if(h < 0) h += 360;
+  }
+  const s = max === 0 ? 0 : d / max;
+  const v = max;
+  return [h, s, v];
+}
+function hsv2rgb(h, s, v){
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  let r, g, b;
+  if(h < 60){ r = c; g = x; b = 0; }
+  else if(h < 120){ r = x; g = c; b = 0; }
+  else if(h < 180){ r = 0; g = c; b = x; }
+  else if(h < 240){ r = 0; g = x; b = c; }
+  else if(h < 300){ r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return [
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255)
+  ];
+}
+
+function isSkinPixel(r, g, b){
+  const [h, s, v] = rgb2hsv(r, g, b);
+  if(v < 0.12) return false;
+  if(s < 0.06) return false;
+  return (h >= 0 && h <= 50) || (h >= 340 && h <= 360);
+}
+function isHairPixel(r, g, b){
+  const [h, s, v] = rgb2hsv(r, g, b);
+  return v > 0.02 && v < 0.45 && s > 0.05;
+}
+
+function remapPixel(r, g, b, targetH, targetS, targetV){
+  const [h, s, v] = rgb2hsv(r, g, b);
+  const newH = targetH;
+  const newS = targetS * (0.5 + s * 0.8);
+  const newV = v * (0.6 + targetV * 0.6);
+  return hsv2rgb(newH, Math.min(1, newS), Math.min(1, newV));
+}
 
 function applyPhenotypeToImage(){
+  if(!imageLoaded || !originalImageData) return;
   const p = STATE.phenotype;
   if(!p) return;
 
-  // 用 CSS filter 改肤色和发色
-  // 思路：将图片整体做 brightness/saturate/hue-rotate
+  const cacheKey = p.skinScore + '_' + p.hairLabel;
+  if(skinCache.has(cacheKey)){
+    humanImg.src = skinCache.get(cacheKey);
+  } else {
+    const [th, ts, tv] = rgb2hsv(
+      Math.round(p.skinColor[0] * 255),
+      Math.round(p.skinColor[1] * 255),
+      Math.round(p.skinColor[2] * 255)
+    );
+    const [hh, hs, hv] = rgb2hsv(
+      Math.round(p.hairColor[0] * 255),
+      Math.round(p.hairColor[1] * 255),
+      Math.round(p.hairColor[2] * 255)
+    );
 
-  // 肤色：根据 skinScore 调 brightness 和 saturate
-  const skinBrightness = 0.6 + (1 - p.skinScore/6) * 0.5;  // 0.6 ~ 1.1
-  const skinSaturate = 0.7 + (1 - p.skinScore/6) * 0.5;    // 0.7 ~ 1.2
+    const src = originalImageData.data;
+    const dst = new Uint8ClampedArray(src.length);
+    dst.set(src);
 
-  // 发色：根据发色偏向调 hue-rotate
-  let hueRotate = 0;
-  if(p.hairLabel === '红发') hueRotate = -20;
-  else if(p.hairLabel === '金发') hueRotate = 20;
-  else if(p.hairLabel === '深棕') hueRotate = 5;
-  else hueRotate = 0; // 乌黑
+    for(let i = 0; i < dst.length; i += 4){
+      const r = src[i], g = src[i+1], b = src[i+2], a = src[i+3];
+      if(a < 10) continue;
+      if(isSkinPixel(r, g, b)){
+        const [nr, ng, nb] = remapPixel(r, g, b, th, ts, tv);
+        dst[i] = nr; dst[i+1] = ng; dst[i+2] = nb;
+      } else if(isHairPixel(r, g, b)){
+        const [nr, ng, nb] = remapPixel(r, g, b, hh, Math.max(0.3, hs), hv);
+        dst[i] = nr; dst[i+1] = ng; dst[i+2] = nb;
+      }
+    }
 
-  // 身高：scaleY
-  const heightScale = p.heightM / 1.7;   // 1.55/1.7 ~ 1.98/1.7
-  // 体型：scaleX
+    const c = document.createElement('canvas');
+    c.width = originalImageData.width;
+    c.height = originalImageData.height;
+    c.getContext('2d').putImageData(new ImageData(dst, c.width, c.height), 0, 0);
+    const dataUrl = c.toDataURL('image/png');
+    skinCache.set(cacheKey, dataUrl);
+    humanImg.src = dataUrl;
+  }
+
+  const heightScale = p.heightM / 1.7;
   const widthScale = 0.9 + p.bodyType * 0.1;
-
-  humanImg.style.filter = `brightness(${skinBrightness}) saturate(${skinSaturate}) hue-rotate(${hueRotate}deg)`;
   humanImg.style.transform = `scaleY(${heightScale}) scaleX(${widthScale})`;
 }
 
@@ -514,25 +604,20 @@ function initScene(){
   updateGenePanel();
 }
 
-/* ============================================================
-   6. 阶段显示：0-4 用 Canvas，5+ 用图片
-   ============================================================ */
 function updateStageDisplay(){
   const stage = STATE.stage;
   if(stage >= 5){
-    // 显示图片
     cellCanvas.style.display = 'none';
     imgWrap.classList.add('show');
     applyPhenotypeToImage();
   } else {
-    // 显示 Canvas 细胞团
     cellCanvas.style.display = 'block';
     imgWrap.classList.remove('show');
   }
 }
 
 /* ============================================================
-   7. 基因面板
+   6. 基因面板
    ============================================================ */
 function updateGenePanel(){
   const p = STATE.phenotype;
@@ -598,7 +683,7 @@ function updateGenePanel(){
 function rgbStr(c){ return `rgb(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)})`; }
 
 /* ============================================================
-   8. 分裂 & 阶段
+   7. 分裂 & 阶段
    ============================================================ */
 function doDivision(){
   if(STATE.cells.length >= MAX_CELLS){ STATE.divisions++; return; }
@@ -607,16 +692,11 @@ function doDivision(){
     if(newCells.length + 1 >= MAX_CELLS){ newCells.push(cell); continue; }
     for(const s of [-1, 1]){
       if(newCells.length >= MAX_CELLS) break;
-      // 分裂方向：随机但稍微向外
       const dx = (Math.random() - 0.5) * 0.6 + cell.pos[0] * 0.3;
       const dy = (Math.random() - 0.5) * 0.6 + cell.pos[1] * 0.3;
       const dz = (Math.random() - 0.5) * 0.6 + cell.pos[2] * 0.3;
       newCells.push({
-        pos: [
-          cell.pos[0] + dx * 0.4,
-          cell.pos[1] + dy * 0.4,
-          cell.pos[2] + dz * 0.4
-        ],
+        pos: [cell.pos[0] + dx*0.4, cell.pos[1] + dy*0.4, cell.pos[2] + dz*0.4],
         type: cell.type,
         size: cell.size * 0.9,
         generation: cell.generation + 1
@@ -654,7 +734,7 @@ function advanceStage(){
 function resetAll(){ initScene(); showTitle('重新随机基因'); }
 
 /* ============================================================
-   9. UI
+   8. UI
    ============================================================ */
 function updateUI(){
   const p = STATE.phenotype;
@@ -679,7 +759,7 @@ function showTitle(text){
 }
 
 /* ============================================================
-   10. 事件
+   9. 事件
    ============================================================ */
 document.getElementById('btnPlay').addEventListener('click', ()=>{ STATE.playing = !STATE.playing; updateUI(); });
 document.getElementById('btnStep').addEventListener('click', advanceStage);
@@ -692,9 +772,9 @@ document.querySelectorAll('.stage-node').forEach(n=>{
 });
 
 /* ============================================================
-   11. F5 切换 UI
+   10. F5 切换 UI
    ============================================================ */
-const UI_SELECTORS = ['#topBar','#genePanel','#timeline','#f5Badge'];
+const UI_SELECTORS = ['#topBar','#genePanel','#timeline','#f5Badge','#loadInfo'];
 const uiHint = document.getElementById('uiHint');
 let uiHidden = false;
 function toggleUI(){
@@ -712,17 +792,15 @@ window.addEventListener('keydown', e => {
 });
 
 /* ============================================================
-   12. 渲染循环
+   11. 渲染循环
    ============================================================ */
 function frame(time){
   time = time || 0;
   const dt = Math.min(50, time - STATE.lastFrameTime);
   STATE.lastFrameTime = time;
 
-  // 自动旋转
-  if(!cam.dragging) cam.yaw += 0.0003 * (dt || 16);
+  if(!cam.dragging && cam.autoRotate) cam.yaw += 0.0003 * (dt || 16);
 
-  // 播放
   if(STATE.playing){
     STATE.playTimer += dt;
     if(STATE.playTimer > 900){
@@ -733,7 +811,6 @@ function frame(time){
     }
   }
 
-  // 早期阶段：画细胞团
   if(STATE.stage <= 4){
     drawCellCluster();
   }
@@ -742,7 +819,7 @@ function frame(time){
 }
 
 /* ============================================================
-   13. 启动
+   12. 启动
    ============================================================ */
 initScene();
 requestAnimationFrame(frame);

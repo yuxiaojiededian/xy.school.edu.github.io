@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>模拟有性生殖 · 八年级下册</title>
+    <title>模拟有性生殖 · 基因随机匹配</title>
     <style>
         * {
             box-sizing: border-box;
@@ -21,8 +21,8 @@
         }
         .experiment-container {
             width: 98vw;
-            max-width: 1600px;
-            min-width: 1000px;
+            max-width: 1700px;
+            min-width: 1100px;
             background: rgba(255, 255, 255, 0.75);
             backdrop-filter: blur(8px);
             border-radius: 36px;
@@ -58,97 +58,196 @@
             padding-left: 14px;
             font-style: italic;
         }
+
+        /* 横向布局：父本区 - 母本区 - 受精卵 */
         .dishes {
             display: flex;
             flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
+            justify-content: space-around;
+            align-items: flex-start;
+            gap: 20px;
             margin: 10px 0 18px;
             padding: 0 6px;
         }
-        .dish-group {
+        .parent-group {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             flex: 1;
-            min-width: 0;
         }
-        .dish-label {
-            font-weight: 500;
+        .parent-title {
+            font-weight: 600;
+            font-size: 1.05rem;
             color: #1f4970;
-            background: rgba(255, 255, 255, 0.6);
-            padding: 5px 20px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 6px 26px;
             border-radius: 100px;
             border: 1px solid #bfd9f0;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-            font-size: 0.95rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+        .parent-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 18px;
+        }
+        .dish-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .dish-caption {
+            font-size: 0.82rem;
+            color: #4a6a8a;
+            font-weight: 500;
             white-space: nowrap;
         }
-        .dish-pair {
-            display: flex;
-            gap: 24px;
-            justify-content: center;
-            flex-wrap: nowrap;
-        }
-        /* 圆盘：grid 布局，格子尺寸缩小，容纳更多染色体 */
+
+        /* 圆盘基础样式 */
         .dish {
-            width: 160px;
-            height: 160px;
             border-radius: 50%;
             background: #dfeaf5;
             box-shadow: 0 10px 16px -6px rgba(30, 60, 90, 0.25), inset 0 0 0 2px rgba(255,255,255,0.8), inset 0 0 18px rgba(80, 120, 160, 0.2);
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            grid-auto-rows: 26px;
-            gap: 1px;
             justify-items: center;
             align-items: center;
-            padding: 12px 8px;
             transition: box-shadow 0.3s;
             position: relative;
             border: 1px solid #ffffff;
             overflow: hidden;
             flex-shrink: 0;
         }
-        .dish.father {
+        /* 父/母体细胞大圆盘 */
+        .dish.body {
+            width: 170px;
+            height: 170px;
+            grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: 36px;
+            gap: 2px;
+            padding: 16px 12px;
+        }
+        .dish.father-body {
             background: #c8dff5;
         }
-        .dish.mother {
+        .dish.mother-body {
             background: #f5d7e6;
         }
+        /* 生殖细胞小圆盘 */
+        .dish.gamete {
+            width: 100px;
+            height: 100px;
+            grid-template-columns: repeat(3, 1fr);
+            grid-auto-rows: 30px;
+            gap: 2px;
+            padding: 10px 8px;
+        }
+        .dish.sperm {
+            background: #b8d4ef;
+            box-shadow: 0 8px 14px -6px rgba(30, 60, 90, 0.3), inset 0 0 0 2px rgba(255,255,255,0.8), inset 0 0 14px rgba(80, 120, 160, 0.25);
+        }
+        .dish.egg {
+            background: #efc8d8;
+            box-shadow: 0 8px 14px -6px rgba(90, 40, 70, 0.3), inset 0 0 0 2px rgba(255,255,255,0.8), inset 0 0 14px rgba(160, 80, 120, 0.25);
+        }
+        /* 受精卵 */
         .dish.zygote {
             width: 200px;
             height: 200px;
             background: #ffe8b6;
             box-shadow: 0 14px 24px -8px #b38b5b60, inset 0 0 0 3px #ffeac2, inset 0 0 24px #dbb47a40;
             border: 1px solid #f5e3b0;
-            grid-template-columns: repeat(5, 1fr);
-            grid-auto-rows: 28px;
-            gap: 2px;
-            padding: 14px 10px;
+            grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: 38px;
+            gap: 3px;
+            padding: 18px 14px;
         }
 
-        /* 染色体：缩小到 22×26，每个格子能放得下 */
-        .chromosome {
-            width: 22px;
-            height: 26px;
+        /* 箭头 */
+        .arrow {
+            font-size: 1.6rem;
+            color: #7aa5c7;
+            padding: 0 4px;
             display: flex;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* ============================================================
+           染色体：用小棒 + 字母标注表示基因
+           每条染色体是一根竖线，旁边标注一个字母
+           ============================================================ */
+        .chromosome {
+            width: 34px;
+            height: 36px;
+            display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            position: relative;
             transition: all 0.2s;
             will-change: transform, opacity;
             line-height: 0;
         }
-        .chromosome svg {
-            display: block;
-            width: 22px;
+        /* 染色体棒（竖向） */
+        .chromosome .rod {
+            width: 6px;
             height: 26px;
-            overflow: visible;
+            border-radius: 3px;
+            background: linear-gradient(
+                to right,
+                rgba(90, 130, 170, 0.85) 0%,
+                rgba(130, 170, 210, 1) 30%,
+                rgba(170, 205, 235, 1) 50%,
+                rgba(130, 170, 210, 1) 70%,
+                rgba(90, 130, 170, 0.85) 100%
+            );
+            box-shadow: 0 1px 3px rgba(40, 80, 120, 0.35);
+            border: 0.5px solid rgba(255,255,255,0.7);
         }
-        .chromosome:hover svg {
+        /* 字母标签（放在棒旁边） */
+        .chromosome .label {
+            position: absolute;
+            top: 0;
+            right: -2px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: #1e3b5c;
+            background: rgba(255,255,255,0.9);
+            border-radius: 3px;
+            padding: 0 2px;
+            line-height: 1.2;
+            box-shadow: 0 0 2px rgba(0,0,0,0.1);
+        }
+        /* 等位基因大写：深蓝 */
+        .chromosome .label.dominant {
+            color: #1c4a7a;
+        }
+        /* 等位基因小写：橙红 */
+        .chromosome .label.recessive {
+            color: #b3452a;
+        }
+        /* 不同基因对用不同色调的棒区分 */
+        .chromosome[data-gene="A"] .rod {
+            background: linear-gradient(to right, #6b8fc0, #9fc0e8, #6b8fc0);
+        }
+        .chromosome[data-gene="B"] .rod {
+            background: linear-gradient(to right, #6bb08a, #9fd8b8, #6bb08a);
+        }
+        .chromosome[data-gene="D"] .rod {
+            background: linear-gradient(to right, #c08a6b, #e8c09f, #c08a6b);
+        }
+        .chromosome[data-gene="E"] .rod {
+            background: linear-gradient(to right, #9a6bc0, #c89fe8, #9a6bc0);
+        }
+        .chromosome[data-gene="F"] .rod {
+            background: linear-gradient(to right, #c06b8a, #e89fbd, #c06b8a);
+        }
+
+        .chromosome:hover .rod {
             filter: brightness(1.15);
         }
 
@@ -156,6 +255,7 @@
             box-shadow: 0 0 0 4px #f9e56c, 0 12px 24px -6px #7a6a2e50 !important;
         }
 
+        /* ===== 按钮 ===== */
         .btn-bar {
             display: flex;
             flex-wrap: wrap;
@@ -224,6 +324,8 @@
             gap: 6px;
             white-space: nowrap;
         }
+
+        /* 语音浮现 */
         .speech-overlay {
             position: fixed;
             bottom: 8%;
@@ -272,6 +374,8 @@
             margin-top: 6px;
             text-align: right;
         }
+
+        /* 飞行的染色体 */
         .flying-chromosome {
             position: fixed;
             z-index: 1000;
@@ -281,21 +385,13 @@
             align-items: center;
             justify-content: center;
         }
-        .flying-chromosome .chromosome {
-            width: 22px;
-            height: 26px;
-        }
-        .flying-chromosome .chromosome svg {
-            width: 22px;
-            height: 26px;
-        }
 
-        @media (max-width: 1100px) {
+        @media (max-width: 1150px) {
             body {
                 justify-content: flex-start;
             }
             .experiment-container {
-                min-width: 1000px;
+                min-width: 1100px;
                 margin: 0 auto;
             }
         }
@@ -304,44 +400,65 @@
 <body>
 
 <div class="experiment-container" id="app">
-    <h1>🧬 模拟有性生殖 <span>八年级下册</span></h1>
-    <div class="subhead">父本 · 母本 · 受精卵 (染色体随机组合)</div>
+    <h1>🧬 模拟有性生殖 <span>基因随机匹配</span></h1>
+    <div class="subhead">父本与母本各产生生殖细胞，精子和卵细胞结合形成受精卵，基因随机组合</div>
 
+    <!-- 横向布局：父本区 - 母本区 - 受精卵 -->
     <div class="dishes" id="dishesContainer">
-        <div class="dish-group">
-            <div class="dish-label">父方 (2个圆盘)</div>
-            <div class="dish-pair">
-                <div class="dish father" id="fatherDish1"></div>
-                <div class="dish father" id="fatherDish2"></div>
+        <!-- 父本区 -->
+        <div class="parent-group">
+            <div class="parent-title">👨 父本</div>
+            <div class="parent-row">
+                <div class="dish-wrapper">
+                    <div class="dish body father-body" id="fatherBody"></div>
+                    <div class="dish-caption">体细胞（成对基因）</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="dish-wrapper">
+                    <div class="dish gamete sperm" id="spermDish"></div>
+                    <div class="dish-caption">精子（单个基因）</div>
+                </div>
             </div>
         </div>
 
-        <div class="dish-group">
-            <div class="dish-label">母方 (2个圆盘)</div>
-            <div class="dish-pair">
-                <div class="dish mother" id="motherDish1"></div>
-                <div class="dish mother" id="motherDish2"></div>
+        <!-- 母本区 -->
+        <div class="parent-group">
+            <div class="parent-title">👩 母本</div>
+            <div class="parent-row">
+                <div class="dish-wrapper">
+                    <div class="dish body mother-body" id="motherBody"></div>
+                    <div class="dish-caption">体细胞（成对基因）</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="dish-wrapper">
+                    <div class="dish gamete egg" id="eggDish"></div>
+                    <div class="dish-caption">卵细胞（单个基因）</div>
+                </div>
             </div>
         </div>
 
-        <div class="dish-group">
-            <div class="dish-label">受精卵</div>
-            <div class="dish zygote" id="zygoteDish"></div>
+        <!-- 受精卵 -->
+        <div class="parent-group">
+            <div class="parent-title">🧬 受精卵</div>
+            <div class="dish-wrapper">
+                <div class="dish zygote" id="zygoteDish"></div>
+                <div class="dish-caption">基因随机组合</div>
+            </div>
         </div>
     </div>
 
     <div class="btn-bar">
         <div class="btn-group">
-            <button class="btn primary" id="animateBtn">▶ 开始实验动画</button>
+            <button class="btn primary" id="animateBtn">▶ 开始受精动画</button>
             <button class="btn secondary" id="downloadXlsxBtn">⬇ 下载数据 (XLSX)</button>
             <button class="btn secondary" id="downloadCsvBtn">⬇ 下载 CSV</button>
             <button class="btn secondary" id="downloadTxtBtn">⬇ 下载 TXT</button>
         </div>
         <div class="data-hint">
-            <span>🧬 24对染色体 · 随机生成</span>
+            <span>🧬 基因随机匹配 · 数据实时生成</span>
         </div>
     </div>
-    <div class="small-note">* 点击动画演示一次完整受精过程，后续数据已填入表格。</div>
+    <div class="small-note">* 精子与卵细胞中的基因随机组合，形成受精卵的成对基因。</div>
 </div>
 
 <div class="speech-overlay" id="speechOverlay">
@@ -350,7 +467,7 @@
 
 <script>
     (function() {
-        // ========== 伪随机与镝增算法 ==========
+        // ========== 伪随机算法 ==========
         let seed = Date.now() + Math.random() * 1000000;
         function random() {
             seed = (seed * 9301 + 49297) % 233280;
@@ -360,188 +477,137 @@
             seed = Date.now() + Math.random() * 1000000 + performance.now();
         }
 
+        // 基因对定义：每对基因有显性（大写）和隐性（小写）
+        const GENE_PAIRS = ['A', 'B', 'D', 'E', 'F'];
+
+        // 生成一组基因数据
+        // 父本体细胞：每对基因两个等位基因（随机大小写）
+        // 母本体细胞：每对基因两个等位基因（随机大小写）
+        // 精子：从父本体细胞每对中随机取一个
+        // 卵细胞：从母本体细胞每对中随机取一个
+        // 受精卵：精子基因 + 卵细胞基因（成对）
+        let fatherBodyData = [];   // [{gene:'A', alleles:['A','a']}, ...]
+        let motherBodyData = [];
+        let spermData = [];        // [{gene:'A', allele:'A'}, ...]
+        let eggData = [];
+        let zygoteData = [];       // [{gene:'A', alleles:['A','a']}, ...]
         let chromosomeData = [];
 
-        function generateRandomChromosomeData() {
+        function generateAllData() {
             reseed();
-            const rows = [];
-            rows.push(['染色体对', '父方染色体1', '父方染色体2', '母方染色体1', '母方染色体2', '受精卵染色体1', '受精卵染色体2']);
-            
-            for (let i = 0; i < 24; i++) {
-                let father1, father2, mother1, mother2;
-                if (i < 22) {
-                    father1 = 'A'; father2 = 'A';
-                    mother1 = 'A'; mother2 = 'A';
-                } else if (i === 22) {
-                    father1 = 'X'; father2 = 'Y';
-                    mother1 = 'X'; mother2 = 'X';
-                } else {
-                    father1 = 'A'; father2 = 'A';
-                    mother1 = 'A'; mother2 = 'A';
-                }
-                const zygoteFromFather = random() < 0.5 ? father1 : father2;
-                const zygoteFromMother = random() < 0.5 ? mother1 : mother2;
-                rows.push([
-                    `第${i+1}对`,
-                    father1, father2,
-                    mother1, mother2,
-                    zygoteFromFather, zygoteFromMother
+            fatherBodyData = [];
+            motherBodyData = [];
+            spermData = [];
+            eggData = [];
+            zygoteData = [];
+            chromosomeData = [];
+
+            GENE_PAIRS.forEach(gene => {
+                // 父本体细胞：两个等位基因随机显隐性
+                const fAllele1 = random() < 0.5 ? gene.toUpperCase() : gene.toLowerCase();
+                const fAllele2 = random() < 0.5 ? gene.toUpperCase() : gene.toLowerCase();
+                fatherBodyData.push({ gene: gene, alleles: [fAllele1, fAllele2] });
+
+                // 母本体细胞
+                const mAllele1 = random() < 0.5 ? gene.toUpperCase() : gene.toLowerCase();
+                const mAllele2 = random() < 0.5 ? gene.toUpperCase() : gene.toLowerCase();
+                motherBodyData.push({ gene: gene, alleles: [mAllele1, mAllele2] });
+
+                // 精子：从父本两个等位基因中随机取一个
+                const spermAllele = random() < 0.5 ? fAllele1 : fAllele2;
+                spermData.push({ gene: gene, allele: spermAllele });
+
+                // 卵细胞：从母本两个等位基因中随机取一个
+                const eggAllele = random() < 0.5 ? mAllele1 : mAllele2;
+                eggData.push({ gene: gene, allele: eggAllele });
+
+                // 受精卵：精子 + 卵细胞
+                zygoteData.push({ gene: gene, alleles: [spermAllele, eggAllele] });
+            });
+
+            // 构建下载表格数据
+            chromosomeData = [];
+            chromosomeData.push(['基因对', '父本体细胞等位基因1', '父本体细胞等位基因2', '母本体细胞等位基因1', '母本体细胞等位基因2', '精子基因', '卵细胞基因', '受精卵等位基因1', '受精卵等位基因2']);
+            GENE_PAIRS.forEach((gene, i) => {
+                chromosomeData.push([
+                    gene,
+                    fatherBodyData[i].alleles[0], fatherBodyData[i].alleles[1],
+                    motherBodyData[i].alleles[0], motherBodyData[i].alleles[1],
+                    spermData[i].allele,
+                    eggData[i].allele,
+                    zygoteData[i].alleles[0], zygoteData[i].alleles[1]
                 ]);
-            }
-            return rows;
+            });
         }
 
-        let fatherDish1Chrom = [], fatherDish2Chrom = [], motherDish1Chrom = [], motherDish2Chrom = [], zygoteChrom = [];
-
-        function fillDishesRandom() {
-            const fatherDish1 = [];
-            const fatherDish2 = [];
-            const motherDish1 = [];
-            const motherDish2 = [];
-            
-            // 性染色体放在最前面
-            if (random() < 0.5) {
-                fatherDish1.push({ type: 'X', label: 'X' });
-                fatherDish2.push({ type: 'Y', label: 'Y' });
-            } else {
-                fatherDish1.push({ type: 'Y', label: 'Y' });
-                fatherDish2.push({ type: 'X', label: 'X' });
-            }
-            motherDish1.push({ type: 'X', label: 'X' });
-            motherDish2.push({ type: 'X', label: 'X' });
-            
-            for (let i = 0; i < 14; i++) {
-                fatherDish1.push({ type: 'autosome', label: 'A' });
-                fatherDish2.push({ type: 'autosome', label: 'A' });
-                motherDish1.push({ type: 'autosome', label: 'A' });
-                motherDish2.push({ type: 'autosome', label: 'A' });
-            }
-
-            const f1Autosomes = fatherDish1.slice(1);
-            const f2Autosomes = fatherDish2.slice(1);
-            const m1Autosomes = motherDish1.slice(1);
-            const m2Autosomes = motherDish2.slice(1);
-            shuffleArray(f1Autosomes);
-            shuffleArray(f2Autosomes);
-            shuffleArray(m1Autosomes);
-            shuffleArray(m2Autosomes);
-            
-            return { 
-                fatherDish1: [fatherDish1[0], ...f1Autosomes],
-                fatherDish2: [fatherDish2[0], ...f2Autosomes],
-                motherDish1: [motherDish1[0], ...m1Autosomes],
-                motherDish2: [motherDish2[0], ...m2Autosomes]
-            };
-        }
-
-        function shuffleArray(arr) {
-            for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(random() * (i + 1));
-                [arr[i], arr[j]] = [arr[j], arr[i]];
-            }
-        }
-
-        // ========== 创建染色体 SVG（缩小版 22×26） ==========
-        function createChromosomeElement(type) {
+        // ========== 创建染色体元素（棒 + 字母） ==========
+        function createChromosomeElement(gene, allele) {
             const wrapper = document.createElement('div');
-            wrapper.className = 'chromosome ' + type;
+            wrapper.className = 'chromosome';
+            wrapper.setAttribute('data-gene', gene);
 
-            const svgNS = 'http://www.w3.org/2000/svg';
-            const svg = document.createElementNS(svgNS, 'svg');
-            svg.setAttribute('width', '22');
-            svg.setAttribute('height', '26');
-            svg.setAttribute('viewBox', '0 0 22 26');
-            svg.style.overflow = 'visible';
+            const rod = document.createElement('div');
+            rod.className = 'rod';
 
-            if (type === 'X') {
-                // X 形：两条交叉线，交叉点约在 (11, 13)
-                const l1 = document.createElementNS(svgNS, 'line');
-                l1.setAttribute('x1', '4');
-                l1.setAttribute('y1', '3');
-                l1.setAttribute('x2', '18');
-                l1.setAttribute('y2', '23');
-                l1.setAttribute('stroke', '#d4458a');
-                l1.setAttribute('stroke-width', '3.5');
-                l1.setAttribute('stroke-linecap', 'round');
+            const label = document.createElement('div');
+            label.className = 'label ' + (allele === allele.toUpperCase() ? 'dominant' : 'recessive');
+            label.textContent = allele;
 
-                const l2 = document.createElementNS(svgNS, 'line');
-                l2.setAttribute('x1', '18');
-                l2.setAttribute('y1', '3');
-                l2.setAttribute('x2', '4');
-                l2.setAttribute('y2', '23');
-                l2.setAttribute('stroke', '#d4458a');
-                l2.setAttribute('stroke-width', '3.5');
-                l2.setAttribute('stroke-linecap', 'round');
-
-                svg.appendChild(l1);
-                svg.appendChild(l2);
-            } else if (type === 'Y') {
-                // Y 形：底部交汇于 (11, 23)，向上分叉到 (4,3) 和 (18,3)
-                const l1 = document.createElementNS(svgNS, 'line');
-                l1.setAttribute('x1', '11');
-                l1.setAttribute('y1', '23');
-                l1.setAttribute('x2', '4');
-                l1.setAttribute('y2', '3');
-                l1.setAttribute('stroke', '#2a72b8');
-                l1.setAttribute('stroke-width', '3.5');
-                l1.setAttribute('stroke-linecap', 'round');
-
-                const l2 = document.createElementNS(svgNS, 'line');
-                l2.setAttribute('x1', '11');
-                l2.setAttribute('y1', '23');
-                l2.setAttribute('x2', '18');
-                l2.setAttribute('y2', '3');
-                l2.setAttribute('stroke', '#2a72b8');
-                l2.setAttribute('stroke-width', '3.5');
-                l2.setAttribute('stroke-linecap', 'round');
-
-                svg.appendChild(l1);
-                svg.appendChild(l2);
-            } else {
-                // 常染色体：两条平行竖线
-                const l1 = document.createElementNS(svgNS, 'line');
-                l1.setAttribute('x1', '8');
-                l1.setAttribute('y1', '3');
-                l1.setAttribute('x2', '8');
-                l1.setAttribute('y2', '23');
-                l1.setAttribute('stroke', '#5f9e5f');
-                l1.setAttribute('stroke-width', '3.5');
-                l1.setAttribute('stroke-linecap', 'round');
-
-                const l2 = document.createElementNS(svgNS, 'line');
-                l2.setAttribute('x1', '14');
-                l2.setAttribute('y1', '3');
-                l2.setAttribute('x2', '14');
-                l2.setAttribute('y2', '23');
-                l2.setAttribute('stroke', '#5f9e5f');
-                l2.setAttribute('stroke-width', '3.5');
-                l2.setAttribute('stroke-linecap', 'round');
-
-                svg.appendChild(l1);
-                svg.appendChild(l2);
-            }
-
-            wrapper.appendChild(svg);
+            wrapper.appendChild(rod);
+            wrapper.appendChild(label);
             return wrapper;
         }
 
-        function renderDish(element, chromosomes) {
+        // 渲染体细胞大圆盘（显示成对基因）
+        function renderBodyDish(element, data) {
             if (!element) return;
             element.innerHTML = '';
-            // grid 布局 5列，最多显示 25 个
-            const displayList = chromosomes.slice(0, 25);
-            displayList.forEach(ch => {
-                const chrEl = createChromosomeElement(ch.type);
-                element.appendChild(chrEl);
+            data.forEach(item => {
+                // 每对基因显示两个染色体，并排
+                const pairWrapper = document.createElement('div');
+                pairWrapper.style.display = 'flex';
+                pairWrapper.style.gap = '2px';
+                pairWrapper.style.alignItems = 'center';
+                pairWrapper.style.justifyContent = 'center';
+                item.alleles.forEach(allele => {
+                    pairWrapper.appendChild(createChromosomeElement(item.gene, allele));
+                });
+                element.appendChild(pairWrapper);
+            });
+        }
+
+        // 渲染生殖细胞小圆盘（显示单个基因）
+        function renderGameteDish(element, data) {
+            if (!element) return;
+            element.innerHTML = '';
+            data.forEach(item => {
+                element.appendChild(createChromosomeElement(item.gene, item.allele));
+            });
+        }
+
+        // 渲染受精卵（成对基因）
+        function renderZygoteDish(element, data) {
+            if (!element) return;
+            element.innerHTML = '';
+            data.forEach(item => {
+                const pairWrapper = document.createElement('div');
+                pairWrapper.style.display = 'flex';
+                pairWrapper.style.gap = '2px';
+                pairWrapper.style.alignItems = 'center';
+                pairWrapper.style.justifyContent = 'center';
+                item.alleles.forEach(allele => {
+                    pairWrapper.appendChild(createChromosomeElement(item.gene, allele));
+                });
+                element.appendChild(pairWrapper);
             });
         }
 
         function renderAll() {
-            renderDish(document.getElementById('fatherDish1'), fatherDish1Chrom);
-            renderDish(document.getElementById('fatherDish2'), fatherDish2Chrom);
-            renderDish(document.getElementById('motherDish1'), motherDish1Chrom);
-            renderDish(document.getElementById('motherDish2'), motherDish2Chrom);
-            renderDish(document.getElementById('zygoteDish'), zygoteChrom);
+            renderBodyDish(document.getElementById('fatherBody'), fatherBodyData);
+            renderBodyDish(document.getElementById('motherBody'), motherBodyData);
+            renderGameteDish(document.getElementById('spermDish'), spermData);
+            renderGameteDish(document.getElementById('eggDish'), eggData);
+            renderZygoteDish(document.getElementById('zygoteDish'), zygoteData);
         }
 
         // ========== 动画核心 ==========
@@ -552,104 +618,94 @@
             return { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
         }
 
-        function createFlyingChromosome(type, startX, startY) {
+        function createFlyingChromosome(gene, allele, startX, startY) {
             const div = document.createElement('div');
             div.className = 'flying-chromosome';
             div.style.left = startX + 'px';
             div.style.top = startY + 'px';
             div.style.position = 'fixed';
 
-            const chrEl = createChromosomeElement(type);
+            const chrEl = createChromosomeElement(gene, allele);
             div.appendChild(chrEl);
 
             document.body.appendChild(div);
             return div;
         }
 
-        async function performRealisticAnimation() {
+        async function performAnimation() {
             if (animating) return;
             animating = true;
             const animateBtn = document.getElementById('animateBtn');
             animateBtn.disabled = true;
 
-            zygoteChrom = [];
-            renderDish(document.getElementById('zygoteDish'), zygoteChrom);
+            // 重新生成数据（每次动画都不同）
+            generateAllData();
 
-            const father1 = document.getElementById('fatherDish1');
-            const father2 = document.getElementById('fatherDish2');
-            const mother1 = document.getElementById('motherDish1');
-            const mother2 = document.getElementById('motherDish2');
+            // 清空受精卵
+            zygoteData = [];
+            renderZygoteDish(document.getElementById('zygoteDish'), zygoteData);
+
+            // 重新渲染父本母本和生殖细胞
+            renderBodyDish(document.getElementById('fatherBody'), fatherBodyData);
+            renderBodyDish(document.getElementById('motherBody'), motherBodyData);
+            renderGameteDish(document.getElementById('spermDish'), spermData);
+            renderGameteDish(document.getElementById('eggDish'), eggData);
+
+            const spermDish = document.getElementById('spermDish');
+            const eggDish = document.getElementById('eggDish');
             const zygote = document.getElementById('zygoteDish');
 
-            father1.classList.add('highlight');
-            father2.classList.add('highlight');
-            mother1.classList.add('highlight');
-            mother2.classList.add('highlight');
+            spermDish.classList.add('highlight');
+            eggDish.classList.add('highlight');
 
-            let fatherSelected1 = fatherDish1Chrom[0] || { type: 'X', label: 'X' };
-            let fatherSelected2 = fatherDish2Chrom[0] || { type: 'Y', label: 'Y' };
-            let motherSelected1 = motherDish1Chrom[0] || { type: 'X', label: 'X' };
-            let motherSelected2 = motherDish2Chrom[0] || { type: 'X', label: 'X' };
-
-            const f1Center = getCenter(father1);
-            const f2Center = getCenter(father2);
-            const m1Center = getCenter(mother1);
-            const m2Center = getCenter(mother2);
+            const spermCenter = getCenter(spermDish);
+            const eggCenter = getCenter(eggDish);
             const zygoteCenter = getCenter(zygote);
 
-            const moveItems = [
-                { from: f1Center, chrom: fatherSelected1 },
-                { from: f2Center, chrom: fatherSelected2 },
-                { from: m1Center, chrom: motherSelected1 },
-                { from: m2Center, chrom: motherSelected2 },
-            ];
-            for (let i = 0; i < 4; i++) {
-                const useFather = random() < 0.5;
-                if (useFather) {
-                    const dishEl = random() < 0.5 ? father1 : father2;
-                    moveItems.push({ from: getCenter(dishEl), chrom: { type: 'autosome', label: 'A' } });
-                } else {
-                    const dishEl = random() < 0.5 ? mother1 : mother2;
-                    moveItems.push({ from: getCenter(dishEl), chrom: { type: 'autosome', label: 'A' } });
-                }
-            }
-
+            // 让精子和卵细胞的每个基因分别飞入受精卵
             const flyers = [];
-            moveItems.forEach((item) => {
-                const flyer = createFlyingChromosome(item.chrom.type, item.from.x - 11, item.from.y - 13);
-                flyers.push({ el: flyer, target: zygoteCenter, chrom: item.chrom });
+
+            // 精子基因飞行
+            spermData.forEach((item, idx) => {
+                const startX = spermCenter.x - 17 + (idx % 3) * 20;
+                const startY = spermCenter.y - 15 + Math.floor(idx / 3) * 18;
+                const flyer = createFlyingChromosome(item.gene, item.allele, startX, startY);
+                flyers.push({ el: flyer, target: zygoteCenter, gene: item.gene, allele: item.allele, from: 'sperm' });
             });
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            // 卵细胞基因飞行
+            eggData.forEach((item, idx) => {
+                const startX = eggCenter.x - 17 + (idx % 3) * 20;
+                const startY = eggCenter.y - 15 + Math.floor(idx / 3) * 18;
+                const flyer = createFlyingChromosome(item.gene, item.allele, startX, startY);
+                flyers.push({ el: flyer, target: zygoteCenter, gene: item.gene, allele: item.allele, from: 'egg' });
+            });
 
+            await new Promise(resolve => setTimeout(resolve, 60));
+
+            // 让它们飞向受精卵中心
             flyers.forEach(flyer => {
                 const el = flyer.el;
-                el.style.left = (zygoteCenter.x - 11) + 'px';
-                el.style.top = (zygoteCenter.y - 13) + 'px';
-                el.style.opacity = '0.9';
+                el.style.left = (zygoteCenter.x - 17) + 'px';
+                el.style.top = (zygoteCenter.y - 15) + 'px';
+                el.style.opacity = '0.85';
             });
 
             await new Promise(resolve => setTimeout(resolve, 2300));
 
-            flyers.forEach(flyer => {
-                flyer.el.remove();
-                if (zygoteChrom.length < 25) {
-                    zygoteChrom.push(flyer.chrom);
-                }
-            });
+            // 移除飞行元素，重建受精卵数据
+            flyers.forEach(flyer => flyer.el.remove());
 
-            for (let i = 0; i < 6; i++) {
-                if (zygoteChrom.length < 25) {
-                    zygoteChrom.push({ type: 'autosome', label: 'A' });
-                }
-            }
+            // 受精卵数据：精子 + 卵细胞 配对
+            zygoteData = GENE_PAIRS.map((gene, i) => ({
+                gene: gene,
+                alleles: [spermData[i].allele, eggData[i].allele]
+            }));
 
-            renderDish(zygote, zygoteChrom);
+            renderZygoteDish(zygote, zygoteData);
 
-            father1.classList.remove('highlight');
-            father2.classList.remove('highlight');
-            mother1.classList.remove('highlight');
-            mother2.classList.remove('highlight');
+            spermDish.classList.remove('highlight');
+            eggDish.classList.remove('highlight');
 
             animating = false;
             animateBtn.disabled = false;
@@ -662,8 +718,8 @@
 
             const overlay = document.getElementById('speechOverlay');
             const speechText = document.getElementById('speechText');
-            const fullText = '根据纸质版实验过程，模拟有性生殖。父本和母本各提供两个圆盘，染色体随机组合形成受精卵。';
-            
+            const fullText = '模拟有性生殖中的基因随机匹配。父本和母本各提供生殖细胞，精子和卵细胞结合形成受精卵，基因随机组合。';
+
             speechText.textContent = '';
             speechText.classList.remove('fade-out');
             overlay.classList.add('show');
@@ -697,55 +753,42 @@
         }
 
         // ========== 下载功能 ==========
-        function buildDataTable() {
-            if (!chromosomeData || chromosomeData.length < 2) {
-                chromosomeData = generateRandomChromosomeData();
-            }
-            return chromosomeData;
-        }
-
         function downloadXlsx() {
-            const data = buildDataTable();
+            const data = chromosomeData.length > 1 ? chromosomeData : (generateAllData(), chromosomeData);
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, '染色体数据');
-            XLSX.writeFile(wb, '有性生殖_24对染色体.xlsx');
+            XLSX.utils.book_append_sheet(wb, ws, '基因数据');
+            XLSX.writeFile(wb, '有性生殖_基因匹配数据.xlsx');
         }
 
         function downloadCsv() {
-            const data = buildDataTable();
-            const csvRows = data.map(row => row.map(cell => `"${cell}"`).join(','));
+            if (chromosomeData.length < 2) generateAllData();
+            const csvRows = chromosomeData.map(row => row.map(cell => `"${cell}"`).join(','));
             const csvString = csvRows.join('\n');
             const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = '有性生殖_24对染色体.csv';
+            link.download = '有性生殖_基因匹配数据.csv';
             link.click();
         }
 
         function downloadTxt() {
-            const data = buildDataTable();
-            const txtRows = data.map(row => row.join('\t'));
+            if (chromosomeData.length < 2) generateAllData();
+            const txtRows = chromosomeData.map(row => row.join('\t'));
             const txtString = txtRows.join('\n');
             const blob = new Blob([txtString], { type: 'text/plain;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = '有性生殖_24对染色体.txt';
+            link.download = '有性生殖_基因匹配数据.txt';
             link.click();
         }
 
         // ========== 初始化 ==========
         window.addEventListener('load', () => {
-            chromosomeData = generateRandomChromosomeData();
-            const dishes = fillDishesRandom();
-            fatherDish1Chrom = dishes.fatherDish1;
-            fatherDish2Chrom = dishes.fatherDish2;
-            motherDish1Chrom = dishes.motherDish1;
-            motherDish2Chrom = dishes.motherDish2;
-            zygoteChrom = [];
+            generateAllData();
             renderAll();
 
-            document.getElementById('animateBtn').addEventListener('click', performRealisticAnimation);
+            document.getElementById('animateBtn').addEventListener('click', performAnimation);
             document.getElementById('downloadXlsxBtn').addEventListener('click', downloadXlsx);
             document.getElementById('downloadCsvBtn').addEventListener('click', downloadCsv);
             document.getElementById('downloadTxtBtn').addEventListener('click', downloadTxt);
